@@ -95,8 +95,7 @@ function buildPromptFromMasterRow({
     selected?.product?.title ? `Primary selected product: ${selected.product.title}` : '',
     selected?.product?.hero_descriptor
       ? `Primary product hero descriptor: ${selected.product.hero_descriptor}`
-      : '',
-    selected?.product?.image_url ? `Primary product image: ${selected.product.image_url}` : ''
+      : ''
   ]);
 }
 
@@ -303,7 +302,7 @@ export async function POST(request) {
             prompt_subcategory: selected.product.prompt_subcategory,
             prompt_style_tags: parseTagList(selected.product.prompt_style_tags).join(', '),
             hero_descriptor: selected.product.hero_descriptor,
-            image_url: selected.product.image_url
+            image_url: ''
           })
         : '';
 
