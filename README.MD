@@ -104,6 +104,16 @@ npm install
 npm run dev
 ```
 
+## Cleanup
+
+```bash
+# remove build output
+npm run clean
+
+# full local reset (also removes dependencies)
+npm run clean:all
+```
+
 Open:
 - `http://localhost:3000/generator`
 

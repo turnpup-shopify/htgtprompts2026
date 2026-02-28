@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "clean": "rm -rf .next out",
+    "clean:all": "rm -rf .next out node_modules"
   },
   "dependencies": {
     "@vercel/blob": "^0.27.0",
