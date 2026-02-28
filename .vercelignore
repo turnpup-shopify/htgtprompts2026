@@ -1,0 +1,17 @@
+# Dependencies/build output
+node_modules
+.next
+out
+
+# Local config/secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# VCS/editor noise
+.git
+.DS_Store
+.vscode
+.idea

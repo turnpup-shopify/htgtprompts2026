@@ -121,11 +121,14 @@ export async function POST(request) {
       let blobModule;
 
       try {
-        const importModule = new Function('moduleName', 'return import(moduleName);');
-        blobModule = await importModule('@vercel/blob');
-      } catch {
+        blobModule = await import('@vercel/blob');
+      } catch (error) {
+        const message =
+          error && typeof error.message === 'string'
+            ? error.message
+            : 'Unable to load @vercel/blob at runtime.';
         return Response.json(
-          { ok: false, error: 'Missing @vercel/blob dependency. Run `npm install @vercel/blob`.' },
+          { ok: false, error: `Missing @vercel/blob dependency. ${message}` },
           { status: 500 }
         );
       }
