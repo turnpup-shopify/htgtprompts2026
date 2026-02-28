@@ -66,7 +66,9 @@ async function findExistingFiles(dir, handle) {
 }
 
 function getBlobPrefix() {
-  return String(process.env.PRODUCT_IMAGE_BLOB_PREFIX || DEFAULT_BLOB_PREFIX)
+  const configured = process.env.PRODUCT_IMAGE_BLOB_PREFIX;
+  const value = configured === undefined ? DEFAULT_BLOB_PREFIX : String(configured);
+  return value
     .trim()
     .replace(/^\/+|\/+$/g, '');
 }

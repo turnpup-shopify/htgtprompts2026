@@ -49,6 +49,9 @@ PRODUCT_IMAGE_BLOB_PREFIX=items
 BLOB_READ_WRITE_TOKEN=vercel_blob_rw_xxx
 ```
 
+If your files are stored at blob root (for example `accent table/...`), set
+`PRODUCT_IMAGE_BLOB_PREFIX` to an empty string in Vercel.
+
 Blob path convention for best matching:
 - `items/<furniture-type>/<product-handle>.jpg`
 - or `items/<furniture-type>/<product-handle>/<any-image-name>.jpg`
