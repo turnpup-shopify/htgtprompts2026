@@ -33,6 +33,7 @@ export default function GeneratorPage() {
   const [selectedImageByKey, setSelectedImageByKey] = useState({});
   const [localImageOptionsByKey, setLocalImageOptionsByKey] = useState({});
   const [localImageStatusByKey, setLocalImageStatusByKey] = useState({});
+  const [hoveredPreviewKey, setHoveredPreviewKey] = useState('');
 
   const furnitureOptionsForRoom = useMemo(() => {
     const selectedRoom = roomOptions.find((item) => item.roomType === roomType);
@@ -291,6 +292,14 @@ export default function GeneratorPage() {
     }));
   }
 
+  function showImagePreview(key) {
+    setHoveredPreviewKey(key);
+  }
+
+  function hideImagePreview(key) {
+    setHoveredPreviewKey((current) => (current === key ? '' : current));
+  }
+
   async function handleGenerate(event) {
     event.preventDefault();
     setLoading(true);
@@ -524,6 +533,11 @@ export default function GeneratorPage() {
               const imageOptions = localImageOptionsByKey[key] || [];
               const selectedImage = selectedImageByKey[key] || imageOptions[0]?.filePath || '';
               const status = localImageStatusByKey[key];
+              const selectedImageOption =
+                imageOptions.find((option) => option.filePath === selectedImage) || null;
+              const selectedImageLabel =
+                selectedImageOption?.relativePath || selectedImageOption?.fileName || selectedImage;
+              const isPreviewOpen = hoveredPreviewKey === key && Boolean(selectedImage);
 
               return (
                 <div key={key} className="card" style={{ background: '#f8faf8' }}>
@@ -561,6 +575,59 @@ export default function GeneratorPage() {
                     >
                       Selected file: {selectedImage}
                     </p>
+                  ) : null}
+                  {selectedImage ? (
+                    <div
+                      style={{ marginTop: '0.45rem', position: 'relative', display: 'inline-block' }}
+                      onMouseEnter={() => showImagePreview(key)}
+                      onMouseLeave={() => hideImagePreview(key)}
+                    >
+                      <a
+                        href={selectedImage}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download
+                        className="mono"
+                        onFocus={() => showImagePreview(key)}
+                        onBlur={() => hideImagePreview(key)}
+                      >
+                        Download selected image
+                      </a>
+                      {isPreviewOpen ? (
+                        <div
+                          role="dialog"
+                          aria-label={`Image preview for ${furnitureType}`}
+                          style={{
+                            position: 'absolute',
+                            zIndex: 20,
+                            left: 0,
+                            top: 'calc(100% + 0.45rem)',
+                            width: 'min(360px, 72vw)',
+                            padding: '0.5rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #d1d5db',
+                            background: '#ffffff',
+                            boxShadow: '0 18px 38px rgba(0, 0, 0, 0.18)'
+                          }}
+                        >
+                          <p className="mono" style={{ margin: '0 0 0.45rem', fontSize: '0.8rem' }}>
+                            {selectedImageLabel}
+                          </p>
+                          <img
+                            src={selectedImage}
+                            alt={`Preview for ${furnitureType}`}
+                            style={{
+                              display: 'block',
+                              width: '100%',
+                              height: 'auto',
+                              borderRadius: '0.35rem',
+                              border: '1px solid #e5e7eb',
+                              background: '#f9fafb'
+                            }}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
                   ) : null}
                   {status ? (
                     <p className="mono" style={{ margin: '0.55rem 0 0', color: '#991b1b' }}>
