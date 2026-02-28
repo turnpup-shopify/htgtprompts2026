@@ -1,7 +1,12 @@
 import { normalizeTag, parseTagList } from '@/lib/normalize';
 import { getProductCatalog } from '@/lib/product-catalog';
 import { getRoomOptions } from '@/lib/room-furniture';
-import { getPresetBySlug, getRuleRows } from '@/lib/sheet-config';
+import {
+  findMasterRowByRoom,
+  getMasterRows,
+  getPresetBySlug,
+  getRuleRows
+} from '@/lib/sheet-config';
 import { isProductTypeMatch } from '@/lib/product-type-match';
 import { getLocalImageCatalogByFurnitureType } from '@/lib/local-image-catalog';
 import {
@@ -45,21 +50,64 @@ function resolveFeaturedProductsByType(value) {
   return result;
 }
 
+function joinPromptSections(sections = []) {
+  return sections
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+function buildPromptFromMasterRow({
+  masterRow,
+  requestedRoomType,
+  requestedSubcategory,
+  requestedStyleTags,
+  requestedFurnitureTypes,
+  selectedProducts,
+  selected
+}) {
+  const styleTags = requestedStyleTags.length ? requestedStyleTags : masterRow.style_tags || [];
+  const selectedProductsBullets = selectedProducts
+    .map((item) => `- ${item.furnitureType}: ${item.product.title}`)
+    .join('\n');
+
+  return joinPromptSections([
+    `Room: ${masterRow.room || requestedRoomType}`,
+    masterRow.room_details ? `Room details:\n${masterRow.room_details}` : '',
+    masterRow.furniture_decor ? `Furniture decor:\n${masterRow.furniture_decor}` : '',
+    masterRow.materials ? `Materials:\n${masterRow.materials}` : '',
+    masterRow.lighting ? `Lighting:\n${masterRow.lighting}` : '',
+    masterRow.camera ? `Camera:\n${masterRow.camera}` : '',
+    masterRow.color_grade ? `Color grade:\n${masterRow.color_grade}` : '',
+    masterRow.negative_styling_rules
+      ? `Negative styling rules:\n${masterRow.negative_styling_rules}`
+      : '',
+    masterRow.hero_object_placement_logic
+      ? `Hero object placement logic:\n${masterRow.hero_object_placement_logic}`
+      : '',
+    masterRow.realism_constraints ? `Realism constraints:\n${masterRow.realism_constraints}` : '',
+    requestedSubcategory ? `Subcategory: ${requestedSubcategory}` : '',
+    requestedFurnitureTypes.length
+      ? `Furniture types: ${requestedFurnitureTypes.join(', ')}`
+      : '',
+    styleTags.length ? `Style tags: ${styleTags.join(', ')}` : '',
+    selectedProductsBullets ? `Selected products:\n${selectedProductsBullets}` : '',
+    selected?.product?.title ? `Primary selected product: ${selected.product.title}` : '',
+    selected?.product?.hero_descriptor
+      ? `Primary product hero descriptor: ${selected.product.hero_descriptor}`
+      : '',
+    selected?.product?.image_url ? `Primary product image: ${selected.product.image_url}` : ''
+  ]);
+}
+
 export async function POST(request) {
   try {
     const body = await request.json().catch(() => ({}));
     const presetSlug = body.presetSlug || DEFAULT_PRESET_SLUG;
     const preset = await getPresetBySlug(presetSlug);
 
-    if (!preset) {
-      return Response.json(
-        { ok: false, error: `Preset not found in sheets: ${presetSlug}` },
-        { status: 404 }
-      );
-    }
-
     const requestedRoomType = normalizeTag(
-      body.roomType || body.category || preset.default_category || ''
+      body.roomType || body.category || preset?.default_category || ''
     );
     if (!requestedRoomType) {
       return Response.json(
@@ -68,11 +116,27 @@ export async function POST(request) {
       );
     }
 
-    const requestedSubcategory = normalizeTag(body.subcategory || preset.default_subcategory || '');
+    const masterRows = await getMasterRows();
+    const masterRow = findMasterRowByRoom(requestedRoomType, masterRows);
+
+    if (masterRows.length && !masterRow) {
+      return Response.json(
+        {
+          ok: false,
+          error: `No matching row in 'master' tab for roomType "${requestedRoomType}".`,
+          availableRooms: masterRows.map((row) => row.room)
+        },
+        { status: 404 }
+      );
+    }
+
+    const requestedSubcategory = normalizeTag(body.subcategory || preset?.default_subcategory || '');
     const requestedStyleTags = parseTagList(
       Array.isArray(body.styleTags) || typeof body.styleTags === 'string'
         ? body.styleTags
-        : preset.default_style_tags
+        : masterRow?.style_tags?.length
+          ? masterRow.style_tags
+          : preset?.default_style_tags
     );
 
     let requestedFurnitureTypes = resolveFurnitureTypesFromBody(
@@ -99,9 +163,12 @@ export async function POST(request) {
     const localCatalog = await getLocalImageCatalogByFurnitureType(requestedFurnitureTypes);
 
     const weights = mergeWeights(await getRuleRows());
-    const seed = [preset.slug, requestedRoomType, requestedSubcategory, requestedStyleTags.join(',')].join(
-      '|'
-    );
+    const seed = [
+      preset?.slug || String(presetSlug || DEFAULT_PRESET_SLUG),
+      requestedRoomType,
+      requestedSubcategory,
+      requestedStyleTags.join(',')
+    ].join('|');
 
     const selectedProducts = [];
     const debugByFurnitureType = [];
@@ -208,30 +275,54 @@ export async function POST(request) {
     const selectedProductsBullets = selectedProducts
       .map((item) => `- ${item.furnitureType}: ${item.product.title}`)
       .join('\n');
+    const prompt = masterRow
+      ? buildPromptFromMasterRow({
+          masterRow,
+          requestedRoomType,
+          requestedSubcategory,
+          requestedStyleTags,
+          requestedFurnitureTypes,
+          selectedProducts,
+          selected
+        })
+      : preset?.prompt_template
+        ? renderTemplate(preset.prompt_template, {
+            preset_slug: preset.slug,
+            preset_name: preset.name,
+            room_type: requestedRoomType,
+            requested_category: requestedRoomType,
+            requested_subcategory: requestedSubcategory,
+            requested_style_tags: requestedStyleTags.join(', '),
+            selected_furniture_types: requestedFurnitureTypes.join(', '),
+            selected_products_bullets: selectedProductsBullets,
+            selected_products_titles: selectedProducts.map((item) => item.product.title).join(', '),
+            product_id: selected.product.shopify_product_id,
+            product_title: selected.product.title,
+            product_handle: selected.product.handle,
+            prompt_category: selected.product.prompt_category,
+            prompt_subcategory: selected.product.prompt_subcategory,
+            prompt_style_tags: parseTagList(selected.product.prompt_style_tags).join(', '),
+            hero_descriptor: selected.product.hero_descriptor,
+            image_url: selected.product.image_url
+          })
+        : '';
 
-    const prompt = renderTemplate(preset.prompt_template, {
-      preset_slug: preset.slug,
-      preset_name: preset.name,
-      room_type: requestedRoomType,
-      requested_category: requestedRoomType,
-      requested_subcategory: requestedSubcategory,
-      requested_style_tags: requestedStyleTags.join(', '),
-      selected_furniture_types: requestedFurnitureTypes.join(', '),
-      selected_products_bullets: selectedProductsBullets,
-      selected_products_titles: selectedProducts.map((item) => item.product.title).join(', '),
-      product_id: selected.product.shopify_product_id,
-      product_title: selected.product.title,
-      product_handle: selected.product.handle,
-      prompt_category: selected.product.prompt_category,
-      prompt_subcategory: selected.product.prompt_subcategory,
-      prompt_style_tags: parseTagList(selected.product.prompt_style_tags).join(', '),
-      hero_descriptor: selected.product.hero_descriptor,
-      image_url: selected.product.image_url
-    });
+    if (!prompt) {
+      return Response.json(
+        { ok: false, error: 'Unable to build prompt. Check `master` tab or preset template data.' },
+        { status: 500 }
+      );
+    }
 
     return Response.json({
       ok: true,
-      preset: { slug: preset.slug, name: preset.name },
+      preset: preset ? { slug: preset.slug, name: preset.name } : null,
+      master: masterRow
+        ? {
+            room: masterRow.room,
+            style_tags: masterRow.style_tags
+          }
+        : null,
       input: {
         roomType: requestedRoomType,
         category: requestedRoomType,
@@ -286,6 +377,7 @@ export async function POST(request) {
         local_fallback_used_for: localFallbackUsedFor,
         unmatched_furniture_types: unmatchedFurnitureTypes,
         furniture_type_debug: debugByFurnitureType,
+        master_row: masterRow?.room || null,
         weights
       }
     });

@@ -58,6 +58,24 @@ Blob path convention for best matching:
 
 ## Required sheet tabs
 
+### `master`
+
+Prompt creation now reads from this tab (matched by `room`):
+
+- `room`
+- `room_details`
+- `furniture_decor`
+- `materials`
+- `lighting`
+- `camera`
+- `color_grade`
+- `negative_styling_rules`
+- `hero_object_placement_logic`
+- `realism_constraints`
+- `style_tags`
+
+The room dropdown in `/generator` is sourced from `master.room`.
+
 ### `room_to_furniture`
 
 Columns:
@@ -93,6 +111,9 @@ Optional:
 - `default_category`
 - `default_subcategory`
 - `default_style_tags`
+
+Note:
+- `presets` is now fallback-only for prompt rendering when `master` rows are not configured.
 
 ### `rules`
 
