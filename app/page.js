@@ -5,7 +5,10 @@ export default function HomePage() {
     <main>
       <h1>HTGT Prompt Generator</h1>
       <p>Use the deterministic generator page to sync products and build prompts.</p>
-      <Link href="/generator">Open Generator</Link>
+      <div className="row">
+        <Link href="/generator">Open Generator</Link>
+        <Link href="/blob-manager">Manage Blob Images</Link>
+      </div>
     </main>
   );
 }
