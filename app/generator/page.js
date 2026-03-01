@@ -36,12 +36,12 @@ function filenameFromUrl(url, fallback = 'image') {
 
 export default function GeneratorPage() {
   const [roomOptions, setRoomOptions] = useState([]);
+  const [selectedStyleTag, setSelectedStyleTag] = useState('');
   const [roomType, setRoomType] = useState('');
   const [selectedFurnitureTypes, setSelectedFurnitureTypes] = useState([]);
   const [customFurnitureType, setCustomFurnitureType] = useState('');
   const [productOptionsByType, setProductOptionsByType] = useState({});
   const [featuredProductsByType, setFeaturedProductsByType] = useState({});
-  const [styleTags, setStyleTags] = useState('');
   const [roomOptionsLoading, setRoomOptionsLoading] = useState(true);
   const [productOptionsLoading, setProductOptionsLoading] = useState(false);
   const [catalogSource, setCatalogSource] = useState('sheets');
@@ -54,9 +54,32 @@ export default function GeneratorPage() {
   const [downloadAllLoading, setDownloadAllLoading] = useState(false);
   const [downloadAllError, setDownloadAllError] = useState('');
 
+  const allStyleTagOptions = useMemo(() => {
+    const set = new Set();
+
+    for (const room of roomOptions) {
+      const tags = Array.isArray(room?.styleTags) ? room.styleTags : [];
+      for (const tag of tags) {
+        const normalized = String(tag || '').trim().toLowerCase();
+        if (normalized) set.add(normalized);
+      }
+    }
+
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [roomOptions]);
+
+  const filteredRoomOptions = useMemo(() => {
+    if (!allStyleTagOptions.length) return roomOptions;
+    if (!selectedStyleTag) return [];
+    return roomOptions.filter((item) => {
+      const tags = Array.isArray(item?.styleTags) ? item.styleTags : [];
+      return tags.includes(selectedStyleTag);
+    });
+  }, [roomOptions, allStyleTagOptions, selectedStyleTag]);
+
   const selectedRoomOption = useMemo(
-    () => roomOptions.find((item) => item.roomType === roomType) || null,
-    [roomOptions, roomType]
+    () => filteredRoomOptions.find((item) => item.roomType === roomType) || null,
+    [filteredRoomOptions, roomType]
   );
 
   const furnitureOptionsForRoom = useMemo(
@@ -135,12 +158,6 @@ export default function GeneratorPage() {
 
         const options = payload.roomOptions || [];
         setRoomOptions(options);
-
-        if (options.length) {
-          const preferred = options.find((item) => item.roomType === 'living-room');
-          const nextRoomType = preferred?.roomType || options[0].roomType;
-          setRoomType(nextRoomType);
-        }
       } catch (err) {
         setError(err.message);
       } finally {
@@ -152,6 +169,35 @@ export default function GeneratorPage() {
   }, []);
 
   useEffect(() => {
+    if (!roomOptions.length) {
+      setSelectedStyleTag('');
+      return;
+    }
+
+    if (!allStyleTagOptions.length) {
+      setSelectedStyleTag('');
+      return;
+    }
+
+    setSelectedStyleTag((current) =>
+      allStyleTagOptions.includes(current) ? current : allStyleTagOptions[0]
+    );
+  }, [roomOptions, allStyleTagOptions]);
+
+  useEffect(() => {
+    if (!filteredRoomOptions.length) {
+      setRoomType('');
+      return;
+    }
+
+    setRoomType((current) =>
+      filteredRoomOptions.some((item) => item.roomType === current)
+        ? current
+        : filteredRoomOptions[0].roomType
+    );
+  }, [filteredRoomOptions]);
+
+  useEffect(() => {
     if (!furnitureOptionsForRoom.length) {
       setSelectedFurnitureTypes([]);
       return;
@@ -159,13 +205,6 @@ export default function GeneratorPage() {
 
     setSelectedFurnitureTypes(pickRandomSubset(furnitureOptionsForRoom, 2, 4));
   }, [furnitureOptionsForRoom]);
-
-  useEffect(() => {
-    const roomStyleTags = Array.isArray(selectedRoomOption?.styleTags)
-      ? selectedRoomOption.styleTags
-      : [];
-    setStyleTags(roomStyleTags.join(', '));
-  }, [selectedRoomOption]);
 
   useEffect(() => {
     if (!roomType || selectedFurnitureTypes.length === 0) {
@@ -407,7 +446,7 @@ export default function GeneratorPage() {
           roomType,
           furnitureTypes: selectedFurnitureTypes,
           featuredProductsByType,
-          styleTags
+          styleTags: selectedStyleTag ? [selectedStyleTag] : []
         })
       });
 
@@ -440,18 +479,42 @@ export default function GeneratorPage() {
           <h2>Controls</h2>
           <form onSubmit={handleGenerate} className="grid">
             <div>
+              <label htmlFor="styleTag">Style Tag</label>
+              <select
+                id="styleTag"
+                value={selectedStyleTag}
+                onChange={(event) => setSelectedStyleTag(event.target.value)}
+                disabled={roomOptionsLoading || !allStyleTagOptions.length}
+              >
+                {allStyleTagOptions.length ? (
+                  allStyleTagOptions.map((tag) => (
+                    <option key={tag} value={tag}>
+                      {tag}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">No style tags available</option>
+                )}
+              </select>
+            </div>
+
+            <div>
               <label htmlFor="roomType">Room Type</label>
               <select
                 id="roomType"
                 value={roomType}
                 onChange={(event) => setRoomType(event.target.value)}
-                disabled={roomOptionsLoading || !roomOptions.length}
+                disabled={roomOptionsLoading || !filteredRoomOptions.length}
               >
-                {roomOptions.map((item) => (
-                  <option key={item.roomType} value={item.roomType}>
-                    {item.roomType}
-                  </option>
-                ))}
+                {filteredRoomOptions.length ? (
+                  filteredRoomOptions.map((item) => (
+                    <option key={item.roomType} value={item.roomType}>
+                      {item.roomType}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">No rooms for selected style tag</option>
+                )}
               </select>
             </div>
 
@@ -551,15 +614,6 @@ export default function GeneratorPage() {
               </div>
             </div>
 
-            <div>
-              <label htmlFor="styleTags">Style Tags (comma-separated)</label>
-              <input
-                id="styleTags"
-                value={styleTags}
-                onChange={(event) => setStyleTags(event.target.value)}
-                placeholder="warm, minimal"
-              />
-            </div>
             <button type="submit" disabled={loading}>
               {loading ? 'Generating...' : 'Generate Prompt'}
             </button>
