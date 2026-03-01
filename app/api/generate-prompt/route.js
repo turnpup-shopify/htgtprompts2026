@@ -60,7 +60,6 @@ function joinPromptSections(sections = []) {
 function buildPromptFromMasterRow({
   masterRow,
   requestedRoomType,
-  requestedSubcategory,
   requestedStyleTags,
   requestedFurnitureTypes,
   selectedProducts,
@@ -86,7 +85,6 @@ function buildPromptFromMasterRow({
       ? `Hero object placement logic:\n${masterRow.hero_object_placement_logic}`
       : '',
     masterRow.realism_constraints ? `Realism constraints:\n${masterRow.realism_constraints}` : '',
-    requestedSubcategory ? `Subcategory: ${requestedSubcategory}` : '',
     requestedFurnitureTypes.length
       ? `Furniture types: ${requestedFurnitureTypes.join(', ')}`
       : '',
@@ -129,9 +127,13 @@ export async function POST(request) {
       );
     }
 
-    const requestedSubcategory = normalizeTag(body.subcategory || preset?.default_subcategory || '');
+    const hasExplicitStyleTags = Array.isArray(body.styleTags)
+      ? body.styleTags.length > 0
+      : typeof body.styleTags === 'string'
+        ? body.styleTags.trim().length > 0
+        : false;
     const requestedStyleTags = parseTagList(
-      Array.isArray(body.styleTags) || typeof body.styleTags === 'string'
+      hasExplicitStyleTags
         ? body.styleTags
         : masterRow?.style_tags?.length
           ? masterRow.style_tags
@@ -165,7 +167,6 @@ export async function POST(request) {
     const seed = [
       preset?.slug || String(presetSlug || DEFAULT_PRESET_SLUG),
       requestedRoomType,
-      requestedSubcategory,
       requestedStyleTags.join(',')
     ].join('|');
 
@@ -213,7 +214,7 @@ export async function POST(request) {
       const pickedForType = pickDeterministicProduct({
         products: matchingProducts,
         category: '',
-        subcategory: requestedSubcategory,
+        subcategory: '',
         requestedStyleTags,
         weights,
         seed: `${seed}|${furnitureType}`
@@ -249,7 +250,7 @@ export async function POST(request) {
       const fallbackPick = pickDeterministicProduct({
         products: [...allEligibleProducts, ...allLocalFallbackProducts],
         category: '',
-        subcategory: requestedSubcategory,
+        subcategory: '',
         requestedStyleTags,
         weights,
         seed: `${seed}|fallback`
@@ -278,7 +279,6 @@ export async function POST(request) {
       ? buildPromptFromMasterRow({
           masterRow,
           requestedRoomType,
-          requestedSubcategory,
           requestedStyleTags,
           requestedFurnitureTypes,
           selectedProducts,
@@ -290,7 +290,7 @@ export async function POST(request) {
             preset_name: preset.name,
             room_type: requestedRoomType,
             requested_category: requestedRoomType,
-            requested_subcategory: requestedSubcategory,
+            requested_subcategory: '',
             requested_style_tags: requestedStyleTags.join(', '),
             selected_furniture_types: requestedFurnitureTypes.join(', '),
             selected_products_bullets: selectedProductsBullets,
@@ -325,7 +325,6 @@ export async function POST(request) {
       input: {
         roomType: requestedRoomType,
         category: requestedRoomType,
-        subcategory: requestedSubcategory,
         styleTags: requestedStyleTags,
         furnitureTypes: requestedFurnitureTypes,
         featuredProductsByType

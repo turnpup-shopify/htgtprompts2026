@@ -15,6 +15,25 @@ function pickRandomSubset(items, min = 2, max = 4) {
   return shuffled.slice(0, count);
 }
 
+function sanitizeFilename(value, fallback = 'image') {
+  const normalized = String(value || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  return normalized || fallback;
+}
+
+function filenameFromUrl(url, fallback = 'image') {
+  try {
+    const parsed = new URL(String(url || ''));
+    const last = parsed.pathname.split('/').pop() || '';
+    return sanitizeFilename(decodeURIComponent(last), fallback);
+  } catch {
+    return sanitizeFilename(String(url || '').split('/').pop(), fallback);
+  }
+}
+
 export default function GeneratorPage() {
   const [roomOptions, setRoomOptions] = useState([]);
   const [roomType, setRoomType] = useState('');
@@ -22,8 +41,7 @@ export default function GeneratorPage() {
   const [customFurnitureType, setCustomFurnitureType] = useState('');
   const [productOptionsByType, setProductOptionsByType] = useState({});
   const [featuredProductsByType, setFeaturedProductsByType] = useState({});
-  const [subcategory, setSubcategory] = useState('corner');
-  const [styleTags, setStyleTags] = useState('warm, minimal');
+  const [styleTags, setStyleTags] = useState('');
   const [roomOptionsLoading, setRoomOptionsLoading] = useState(true);
   const [productOptionsLoading, setProductOptionsLoading] = useState(false);
   const [catalogSource, setCatalogSource] = useState('sheets');
@@ -33,11 +51,18 @@ export default function GeneratorPage() {
   const [selectedImageByKey, setSelectedImageByKey] = useState({});
   const [localImageOptionsByKey, setLocalImageOptionsByKey] = useState({});
   const [localImageStatusByKey, setLocalImageStatusByKey] = useState({});
+  const [downloadAllLoading, setDownloadAllLoading] = useState(false);
+  const [downloadAllError, setDownloadAllError] = useState('');
 
-  const furnitureOptionsForRoom = useMemo(() => {
-    const selectedRoom = roomOptions.find((item) => item.roomType === roomType);
-    return selectedRoom?.furnitureTypes || [];
-  }, [roomOptions, roomType]);
+  const selectedRoomOption = useMemo(
+    () => roomOptions.find((item) => item.roomType === roomType) || null,
+    [roomOptions, roomType]
+  );
+
+  const furnitureOptionsForRoom = useMemo(
+    () => selectedRoomOption?.furnitureTypes || [],
+    [selectedRoomOption]
+  );
 
   const visibleFurnitureTypes = useMemo(() => {
     const merged = [...furnitureOptionsForRoom, ...selectedFurnitureTypes];
@@ -57,6 +82,43 @@ export default function GeneratorPage() {
 
     return map;
   }, [result]);
+
+  const selectedImagesForPrompt = useMemo(() => {
+    const promptFurnitureTypes = Array.isArray(result?.input?.furnitureTypes)
+      ? result.input.furnitureTypes
+      : [];
+    const targetTypes = promptFurnitureTypes.length ? promptFurnitureTypes : selectedFurnitureTypes;
+    const uniqueByUrl = new Map();
+
+    for (const furnitureType of targetTypes) {
+      const key = String(furnitureType || '').trim().toLowerCase();
+      if (!key) continue;
+
+      const options = localImageOptionsByKey[key] || [];
+      const selectedImageUrl = selectedImageByKey[key] || options[0]?.filePath || '';
+      if (!selectedImageUrl) continue;
+
+      if (uniqueByUrl.has(selectedImageUrl)) continue;
+      const option = options.find((item) => item.filePath === selectedImageUrl);
+      const originalName =
+        option?.fileName ||
+        option?.relativePath ||
+        filenameFromUrl(selectedImageUrl, `${sanitizeFilename(key, 'furniture')}.jpg`);
+      const prefixedName = `${sanitizeFilename(key, 'furniture')}-${sanitizeFilename(
+        originalName,
+        'image.jpg'
+      )}`;
+
+      uniqueByUrl.set(selectedImageUrl, {
+        url: selectedImageUrl,
+        fileName: prefixedName
+      });
+    }
+
+    return [...uniqueByUrl.values()];
+  }, [result, selectedFurnitureTypes, localImageOptionsByKey, selectedImageByKey]);
+
+  const canDownloadAllSelectedImages = Boolean(result?.prompt) && selectedImagesForPrompt.length > 0;
 
   useEffect(() => {
     async function loadRoomOptions() {
@@ -97,6 +159,13 @@ export default function GeneratorPage() {
 
     setSelectedFurnitureTypes(pickRandomSubset(furnitureOptionsForRoom, 2, 4));
   }, [furnitureOptionsForRoom]);
+
+  useEffect(() => {
+    const roomStyleTags = Array.isArray(selectedRoomOption?.styleTags)
+      ? selectedRoomOption.styleTags
+      : [];
+    setStyleTags(roomStyleTags.join(', '));
+  }, [selectedRoomOption]);
 
   useEffect(() => {
     if (!roomType || selectedFurnitureTypes.length === 0) {
@@ -291,6 +360,39 @@ export default function GeneratorPage() {
     }));
   }
 
+  async function handleDownloadAllSelectedImages() {
+    if (!canDownloadAllSelectedImages || downloadAllLoading) return;
+    setDownloadAllLoading(true);
+    setDownloadAllError('');
+
+    try {
+      for (const item of selectedImagesForPrompt) {
+        const response = await fetch(item.url, { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`Failed to download ${item.fileName} (${response.status}).`);
+        }
+
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = objectUrl;
+        anchor.download = item.fileName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(objectUrl);
+
+        // Space downloads slightly so browsers do not collapse multiple clicks.
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((resolve) => setTimeout(resolve, 120));
+      }
+    } catch (err) {
+      setDownloadAllError(err?.message || 'Failed to download selected images.');
+    } finally {
+      setDownloadAllLoading(false);
+    }
+  }
+
   async function handleGenerate(event) {
     event.preventDefault();
     setLoading(true);
@@ -305,7 +407,6 @@ export default function GeneratorPage() {
           roomType,
           furnitureTypes: selectedFurnitureTypes,
           featuredProductsByType,
-          subcategory,
           styleTags
         })
       });
@@ -451,15 +552,6 @@ export default function GeneratorPage() {
             </div>
 
             <div>
-              <label htmlFor="subcategory">Subcategory</label>
-              <input
-                id="subcategory"
-                value={subcategory}
-                onChange={(event) => setSubcategory(event.target.value)}
-                placeholder="corner"
-              />
-            </div>
-            <div>
               <label htmlFor="styleTags">Style Tags (comma-separated)</label>
               <input
                 id="styleTags"
@@ -482,6 +574,21 @@ export default function GeneratorPage() {
             value={result?.prompt || ''}
             placeholder="Generated prompt appears here..."
           />
+          <button
+            type="button"
+            onClick={handleDownloadAllSelectedImages}
+            disabled={!canDownloadAllSelectedImages || downloadAllLoading}
+            style={{ marginTop: '0.75rem' }}
+          >
+            {downloadAllLoading
+              ? `Downloading ${selectedImagesForPrompt.length} image(s)...`
+              : `Download All Selected Images (${selectedImagesForPrompt.length})`}
+          </button>
+          {downloadAllError ? (
+            <p className="mono" style={{ color: '#991b1b', marginTop: '0.55rem', marginBottom: 0 }}>
+              {downloadAllError}
+            </p>
+          ) : null}
         </section>
       </div>
 
