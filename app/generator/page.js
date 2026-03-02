@@ -705,31 +705,6 @@ export default function GeneratorPage() {
       </div>
 
       <section className="card" style={{ marginTop: '1rem' }}>
-        <h2>Debug Panel</h2>
-        <pre className="mono" style={{ overflowX: 'auto', margin: 0 }}>
-          {JSON.stringify(
-            result
-              ? {
-                  input: result.input,
-                  selectedProduct: result.selectedProduct,
-                  selectedProducts: result.selectedProducts,
-                  scoreBreakdown: result.scoreBreakdown,
-                  debug: result.debug
-                }
-              : {
-                  input: null,
-                  selectedProduct: null,
-                  selectedProducts: null,
-                  scoreBreakdown: null,
-                  debug: null
-                },
-            null,
-            2
-          )}
-        </pre>
-      </section>
-
-      <section className="card" style={{ marginTop: '1rem' }}>
         <h2>Image Catalog Options</h2>
         {!selectedFurnitureTypes.length ? (
           <p className="mono" style={{ margin: 0 }}>
@@ -830,6 +805,35 @@ export default function GeneratorPage() {
           </div>
         )}
       </section>
+
+      <details style={{ marginTop: '1rem' }}>
+        <summary style={{ cursor: 'pointer', fontWeight: 600, padding: '0.75rem 1rem', background: '#f1f5f9', borderRadius: '0.5rem', userSelect: 'none' }}>
+          Debug Panel
+        </summary>
+        <section className="card" style={{ marginTop: '0.5rem' }}>
+          <pre className="mono" style={{ overflowX: 'auto', margin: 0 }}>
+            {JSON.stringify(
+              result
+                ? {
+                    input: result.input,
+                    selectedProduct: result.selectedProduct,
+                    selectedProducts: result.selectedProducts,
+                    scoreBreakdown: result.scoreBreakdown,
+                    debug: result.debug
+                  }
+                : {
+                    input: null,
+                    selectedProduct: null,
+                    selectedProducts: null,
+                    scoreBreakdown: null,
+                    debug: null
+                  },
+              null,
+              2
+            )}
+          </pre>
+        </section>
+      </details>
     </main>
   );
 }
