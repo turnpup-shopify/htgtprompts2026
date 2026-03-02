@@ -42,6 +42,8 @@ export default function GeneratorPage() {
   const [customFurnitureType, setCustomFurnitureType] = useState('');
   const [productOptionsByType, setProductOptionsByType] = useState({});
   const [featuredProductsByType, setFeaturedProductsByType] = useState({});
+  const [availableFurnitureTypes, setAvailableFurnitureTypes] = useState([]);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [roomOptionsLoading, setRoomOptionsLoading] = useState(true);
   const [productOptionsLoading, setProductOptionsLoading] = useState(false);
   const [catalogSource, setCatalogSource] = useState('sheets');
@@ -88,9 +90,13 @@ export default function GeneratorPage() {
   );
 
   const visibleFurnitureTypes = useMemo(() => {
-    const merged = [...furnitureOptionsForRoom, ...selectedFurnitureTypes];
+    // Show only room types that have products/images, plus any custom types the user added.
+    const customTypes = selectedFurnitureTypes.filter(
+      (type) => !furnitureOptionsForRoom.includes(type)
+    );
+    const merged = [...availableFurnitureTypes, ...customTypes];
     return [...new Set(merged)];
-  }, [furnitureOptionsForRoom, selectedFurnitureTypes]);
+  }, [availableFurnitureTypes, furnitureOptionsForRoom, selectedFurnitureTypes]);
 
   const selectedProductByFurnitureType = useMemo(() => {
     const map = {};
@@ -198,24 +204,28 @@ export default function GeneratorPage() {
   }, [filteredRoomOptions]);
 
   useEffect(() => {
-    if (!furnitureOptionsForRoom.length) {
+    if (!availableFurnitureTypes.length) {
       setSelectedFurnitureTypes([]);
       return;
     }
 
-    setSelectedFurnitureTypes(pickRandomSubset(furnitureOptionsForRoom, 2, 4));
-  }, [furnitureOptionsForRoom]);
+    setSelectedFurnitureTypes(pickRandomSubset(availableFurnitureTypes, 2, 4));
+  }, [availableFurnitureTypes]);
 
+  // Load product options for ALL furniture types in the room to determine which have images.
+  // This filters the checkbox list to only types that have a blob/catalog match.
   useEffect(() => {
-    if (!roomType || selectedFurnitureTypes.length === 0) {
+    if (!roomType || !furnitureOptionsForRoom.length) {
       setProductOptionsByType({});
       setFeaturedProductsByType({});
+      setAvailableFurnitureTypes([]);
       return;
     }
 
     let isCancelled = false;
 
-    async function loadProductOptions() {
+    async function loadAllRoomProductOptions() {
+      setAvailabilityLoading(true);
       setProductOptionsLoading(true);
       setError('');
 
@@ -225,7 +235,7 @@ export default function GeneratorPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             roomType,
-            furnitureTypes: selectedFurnitureTypes
+            furnitureTypes: furnitureOptionsForRoom
           })
         });
         const payload = await response.json();
@@ -239,37 +249,81 @@ export default function GeneratorPage() {
         const optionsByType = payload.optionsByFurnitureType || {};
         setProductOptionsByType(optionsByType);
         setCatalogSource(payload.source || 'sheets');
+
+        // Only expose furniture types that have at least one product or blob image.
+        const available = furnitureOptionsForRoom.filter(
+          (type) => (optionsByType[type] || []).length > 0
+        );
+        setAvailableFurnitureTypes(available);
+
         setFeaturedProductsByType((current) => {
           const next = {};
-
-          for (const type of selectedFurnitureTypes) {
+          for (const type of furnitureOptionsForRoom) {
             const selected = current[type] || '';
             const options = optionsByType[type] || [];
             const stillValid = options.some((option) => option.shopify_product_id === selected);
             next[type] = stillValid ? selected : '';
           }
-
           return next;
         });
       } catch (err) {
         if (!isCancelled) {
           setProductOptionsByType({});
           setFeaturedProductsByType({});
+          // On error fall back to showing all types so the UI isn't empty.
+          setAvailableFurnitureTypes(furnitureOptionsForRoom);
           setError(err.message);
         }
       } finally {
         if (!isCancelled) {
+          setAvailabilityLoading(false);
           setProductOptionsLoading(false);
         }
       }
     }
 
-    loadProductOptions();
+    loadAllRoomProductOptions();
 
     return () => {
       isCancelled = true;
     };
-  }, [roomType, selectedFurnitureTypes]);
+  }, [roomType, furnitureOptionsForRoom]);
+
+  // For custom furniture types (added by the user, not in the room sheet), load their options
+  // separately and merge them into productOptionsByType.
+  useEffect(() => {
+    const customTypes = selectedFurnitureTypes.filter(
+      (type) => !furnitureOptionsForRoom.includes(type)
+    );
+
+    if (!roomType || !customTypes.length) return;
+
+    let isCancelled = false;
+
+    async function loadCustomTypeOptions() {
+      try {
+        const response = await fetch('/api/product-options', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roomType, furnitureTypes: customTypes })
+        });
+        const payload = await response.json();
+
+        if (!response.ok || !payload.ok || isCancelled) return;
+
+        const optionsByType = payload.optionsByFurnitureType || {};
+        setProductOptionsByType((current) => ({ ...current, ...optionsByType }));
+      } catch {
+        // Custom type options are best-effort; ignore errors.
+      }
+    }
+
+    loadCustomTypeOptions();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [roomType, selectedFurnitureTypes, furnitureOptionsForRoom]);
 
   useEffect(() => {
     if (!selectedFurnitureTypes.length) {
@@ -362,7 +416,7 @@ export default function GeneratorPage() {
   }, [selectedFurnitureTypes, localImageOptionsByKey]);
 
   function randomizeFurnitureSet() {
-    setSelectedFurnitureTypes(pickRandomSubset(furnitureOptionsForRoom, 2, 4));
+    setSelectedFurnitureTypes(pickRandomSubset(availableFurnitureTypes, 2, 4));
   }
 
   function toggleFurnitureType(type) {
@@ -525,14 +579,18 @@ export default function GeneratorPage() {
                   <button
                     type="button"
                     onClick={randomizeFurnitureSet}
-                    disabled={!furnitureOptionsForRoom.length}
+                    disabled={availabilityLoading || !availableFurnitureTypes.length}
                   >
                     Auto-Select Random Furniture Set
                   </button>
                 </div>
-                {!furnitureOptionsForRoom.length ? (
+                {availabilityLoading ? (
                   <p className="mono" style={{ margin: 0 }}>
-                    No furniture options found for this room type.
+                    Checking available furniture types...
+                  </p>
+                ) : !availableFurnitureTypes.length ? (
+                  <p className="mono" style={{ margin: 0 }}>
+                    No furniture options with images found for this room type.
                   </p>
                 ) : (
                   <div className="checkbox-grid">
