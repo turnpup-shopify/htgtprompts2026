@@ -160,7 +160,9 @@ export async function POST(request) {
 
     const catalog = await getProductCatalog();
     const normalizedProducts = catalog.products;
-    const allEligibleProducts = normalizedProducts;
+    // Only consider products that have an image — products without a blob path
+    // cannot be used in the prompt generator and should be silently excluded.
+    const allEligibleProducts = normalizedProducts.filter((p) => p.image_url);
     const localCatalog = await getLocalImageCatalogByFurnitureType(requestedFurnitureTypes);
 
     const weights = mergeWeights(await getRuleRows());

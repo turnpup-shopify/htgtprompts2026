@@ -31,7 +31,7 @@ export async function POST(request) {
 
     for (const furnitureType of furnitureTypes) {
       let options = normalized
-        .filter((item) => isProductTypeMatch(item.product_type, furnitureType))
+        .filter((item) => isProductTypeMatch(item.product_type, furnitureType) && item.image_url)
         .sort((a, b) => String(a.title).localeCompare(String(b.title)))
         .map((item) => ({
           shopify_product_id: item.shopify_product_id,
