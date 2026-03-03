@@ -263,17 +263,9 @@ export async function POST(request) {
       }
     }
 
-    if (!selectedProducts.length) {
-      return Response.json(
-        {
-          ok: false,
-          error: 'No matching product found after scoring. Check `products` sheet or your image catalog source.'
-        },
-        { status: 404 }
-      );
-    }
-
-    const selected = selectedProducts[0];
+    // No hard failure when no products are found — the prompt is still built from room/style
+    // data and includes the requested furniture types even without specific product matches.
+    const selected = selectedProducts[0] || null;
     const selectedProductsBullets = selectedProducts
       .map((item) => `- ${item.furnitureType}: ${item.product.title}`)
       .join('\n');
@@ -297,13 +289,13 @@ export async function POST(request) {
             selected_furniture_types: requestedFurnitureTypes.join(', '),
             selected_products_bullets: selectedProductsBullets,
             selected_products_titles: selectedProducts.map((item) => item.product.title).join(', '),
-            product_id: selected.product.shopify_product_id,
-            product_title: selected.product.title,
-            product_handle: selected.product.handle,
-            prompt_category: selected.product.prompt_category,
-            prompt_subcategory: selected.product.prompt_subcategory,
-            prompt_style_tags: parseTagList(selected.product.prompt_style_tags).join(', '),
-            hero_descriptor: selected.product.hero_descriptor,
+            product_id: selected?.product?.shopify_product_id || '',
+            product_title: selected?.product?.title || '',
+            product_handle: selected?.product?.handle || '',
+            prompt_category: selected?.product?.prompt_category || '',
+            prompt_subcategory: selected?.product?.prompt_subcategory || '',
+            prompt_style_tags: parseTagList(selected?.product?.prompt_style_tags).join(', '),
+            hero_descriptor: selected?.product?.hero_descriptor || '',
             image_url: ''
           })
         : '';
@@ -332,7 +324,7 @@ export async function POST(request) {
         featuredProductsByType
       },
       prompt,
-      selectedProduct: {
+      selectedProduct: selected ? {
         shopify_product_id: selected.product.shopify_product_id,
         title: selected.product.title,
         handle: selected.product.handle,
@@ -344,7 +336,7 @@ export async function POST(request) {
         image_url: selected.product.image_url,
         image_options: selected.product.image_options || [],
         in_stock: selected.product.in_stock
-      },
+      } : null,
       selectedProducts: selectedProducts.map((item) => ({
         furniture_type: item.furnitureType,
         total_score: item.total,
@@ -362,11 +354,11 @@ export async function POST(request) {
         image_options: item.product.image_options || [],
         in_stock: item.product.in_stock
       })),
-      scoreBreakdown: {
+      scoreBreakdown: selected ? {
         total: selected.total,
         ...selected.breakdown,
         matched_style_tags: selected.matchedStyleTags
-      },
+      } : null,
       debug: {
         data_source: `${catalog.source}_plus_google_sheets`,
         image_catalog_source: localCatalog.storageSource,
