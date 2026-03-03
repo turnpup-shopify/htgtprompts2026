@@ -93,7 +93,8 @@ function buildPromptFromMasterRow({
     selected?.product?.title ? `Primary selected product: ${selected.product.title}` : '',
     selected?.product?.hero_descriptor
       ? `Primary product hero descriptor: ${selected.product.hero_descriptor}`
-      : ''
+      : '',
+    'Image instructions: The attached image(s) must be featured prominently in the scene. Render the exact piece(s) shown — do not substitute or reimagine them.'
   ]);
 }
 

@@ -518,22 +518,36 @@ export default function GeneratorPage() {
           <form onSubmit={handleGenerate} className="grid">
             <div>
               <label htmlFor="styleTag">Style Tag</label>
-              <select
-                id="styleTag"
-                value={selectedStyleTag}
-                onChange={(event) => setSelectedStyleTag(event.target.value)}
-                disabled={roomOptionsLoading || !allStyleTagOptions.length}
-              >
-                {allStyleTagOptions.length ? (
-                  allStyleTagOptions.map((tag) => (
-                    <option key={tag} value={tag}>
-                      {tag}
-                    </option>
-                  ))
-                ) : (
-                  <option value="">No style tags available</option>
-                )}
-              </select>
+              <div className="row" style={{ gap: '0.4rem' }}>
+                <select
+                  id="styleTag"
+                  value={selectedStyleTag}
+                  onChange={(event) => setSelectedStyleTag(event.target.value)}
+                  disabled={roomOptionsLoading || !allStyleTagOptions.length}
+                  style={{ flex: 1 }}
+                >
+                  {allStyleTagOptions.length ? (
+                    allStyleTagOptions.map((tag) => (
+                      <option key={tag} value={tag}>
+                        {tag}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">No style tags available</option>
+                  )}
+                </select>
+                <button
+                  type="button"
+                  disabled={allStyleTagOptions.length < 2}
+                  onClick={() => {
+                    const others = allStyleTagOptions.filter((t) => t !== selectedStyleTag);
+                    setSelectedStyleTag(others[Math.floor(Math.random() * others.length)]);
+                  }}
+                  style={{ flexShrink: 0 }}
+                >
+                  ↺
+                </button>
+              </div>
             </div>
 
             <div>
