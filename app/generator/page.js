@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const DEFAULT_PRESET_SLUG = 'living-room-corner-warm-minimal';
 
@@ -52,6 +52,10 @@ export default function GeneratorPage() {
   const [localImageOptionsByKey, setLocalImageOptionsByKey] = useState({});
   const [downloadAllLoading, setDownloadAllLoading] = useState(false);
   const [downloadAllError, setDownloadAllError] = useState('');
+
+  // Holds furniture from a cross-row mix; tells the furnitureOptionsForRoom effect to
+  // skip its normal randomisation so the mixed selection survives the room-type change.
+  const pendingMixedFurnitureRef = useRef(null);
 
   const allStyleTagOptions = useMemo(() => {
     const set = new Set();
@@ -203,6 +207,13 @@ export default function GeneratorPage() {
   useEffect(() => {
     if (!furnitureOptionsForRoom.length) {
       setSelectedFurnitureTypes([]);
+      pendingMixedFurnitureRef.current = null;
+      return;
+    }
+
+    // If Mix It Up pre-loaded a cross-row furniture selection, keep it and don't override.
+    if (pendingMixedFurnitureRef.current !== null) {
+      pendingMixedFurnitureRef.current = null;
       return;
     }
 
@@ -393,6 +404,37 @@ export default function GeneratorPage() {
 
   function randomizeFurnitureSet() {
     setSelectedFurnitureTypes(pickRandomSubset(furnitureOptionsForRoom, 2, 4));
+  }
+
+  function handleMixItUp() {
+    if (roomOptions.length < 2) return;
+
+    // Shuffle all rows and pick three distinct ones (or reuse if not enough rows).
+    const shuffled = [...roomOptions].sort(() => Math.random() - 0.5);
+    const rowA = shuffled[0]; // contributes: style tag + room type
+    const rowB = shuffled[1]; // contributes: furniture types
+
+    // Column 1 — style tag from row A
+    const tagsA = Array.isArray(rowA?.styleTags) ? rowA.styleTags.filter(Boolean) : [];
+    const newStyleTag = tagsA.length
+      ? tagsA[Math.floor(Math.random() * tagsA.length)]
+      : selectedStyleTag;
+
+    // Column 3 — furniture from row B (a different room entirely)
+    const furnitureB = Array.isArray(rowB?.furnitureTypes) ? rowB.furnitureTypes.filter(Boolean) : [];
+    if (furnitureB.length) {
+      const mixed = pickRandomSubset(furnitureB, 2, 4);
+      // Set immediately so it's visible even if the room type doesn't change
+      // (and therefore the effect won't fire to consume the ref).
+      pendingMixedFurnitureRef.current = mixed;
+      setSelectedFurnitureTypes(mixed);
+    }
+
+    // Column 2 — room type from row A (paired with its style tag so it stays valid)
+    setSelectedStyleTag(newStyleTag);
+    if (rowA?.roomType) {
+      setRoomType(rowA.roomType);
+    }
   }
 
   function selectAllFurniture() {
@@ -695,6 +737,15 @@ export default function GeneratorPage() {
                 )}
               </div>
             </details>
+
+            <button
+              type="button"
+              onClick={handleMixItUp}
+              disabled={roomOptions.length < 2}
+              style={{ background: '#1e3a5f', color: '#fff' }}
+            >
+              Crossmix (random row per column)
+            </button>
 
             <button type="submit" disabled={loading}>
               {loading ? 'Generating...' : 'Generate Prompt'}
