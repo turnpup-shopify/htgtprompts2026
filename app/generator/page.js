@@ -395,6 +395,14 @@ export default function GeneratorPage() {
     setSelectedFurnitureTypes(pickRandomSubset(furnitureOptionsForRoom, 2, 4));
   }
 
+  function selectAllFurniture() {
+    setSelectedFurnitureTypes([...visibleFurnitureTypes]);
+  }
+
+  function clearAllFurniture() {
+    setSelectedFurnitureTypes([]);
+  }
+
   function toggleFurnitureType(type) {
     setSelectedFurnitureTypes((current) => {
       if (current.includes(type)) {
@@ -551,13 +559,27 @@ export default function GeneratorPage() {
             <div>
               <label>Furniture Options (from room_to_furniture sheet)</label>
               <div className="card" style={{ background: '#f8faf8', padding: '0.75rem' }}>
-                <div className="row" style={{ marginBottom: '0.6rem' }}>
+                <div className="row" style={{ marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.4rem' }}>
                   <button
                     type="button"
                     onClick={randomizeFurnitureSet}
                     disabled={!furnitureOptionsForRoom.length}
                   >
                     Auto-Select Random Furniture Set
+                  </button>
+                  <button
+                    type="button"
+                    onClick={selectAllFurniture}
+                    disabled={!visibleFurnitureTypes.length}
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearAllFurniture}
+                    disabled={!selectedFurnitureTypes.length}
+                  >
+                    Clear All
                   </button>
                 </div>
                 {!furnitureOptionsForRoom.length ? (
@@ -644,7 +666,7 @@ export default function GeneratorPage() {
               </div>
             </div>
 
-            <button type="submit" disabled={loading || selectedFurnitureTypes.length === 0}>
+            <button type="submit" disabled={loading}>
               {loading ? 'Generating...' : 'Generate Prompt'}
             </button>
           </form>
