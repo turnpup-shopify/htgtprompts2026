@@ -301,7 +301,12 @@ export async function POST(request) {
           })
         : '';
 
-    if (!prompt) {
+    const finalPrompt = /mirror/i.test(prompt)
+      ? prompt +
+        '\nMirror reflection: The mirror should show a soft, realistic reflection — ambient light source visible, vague architectural depth, nothing distracting or specific.'
+      : prompt;
+
+    if (!finalPrompt) {
       return Response.json(
         { ok: false, error: 'Unable to build prompt. Check `master` tab or preset template data.' },
         { status: 500 }
@@ -324,7 +329,7 @@ export async function POST(request) {
         furnitureTypes: requestedFurnitureTypes,
         featuredProductsByType
       },
-      prompt,
+      prompt: finalPrompt,
       selectedProduct: selected ? {
         shopify_product_id: selected.product.shopify_product_id,
         title: selected.product.title,
