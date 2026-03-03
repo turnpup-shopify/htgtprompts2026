@@ -627,8 +627,10 @@ export default function GeneratorPage() {
               </div>
             </div>
 
-            <div>
-              <label>Featured Product Selection (optional)</label>
+            <details>
+              <summary style={{ cursor: 'pointer', fontWeight: 600, userSelect: 'none', marginBottom: '0.5rem' }}>
+                Featured Product Selection (optional)
+              </summary>
               <div className="card" style={{ background: '#f8faf8', padding: '0.75rem' }}>
                 {productOptionsLoading ? (
                   <p className="mono" style={{ margin: 0 }}>
@@ -678,7 +680,7 @@ export default function GeneratorPage() {
                   </div>
                 )}
               </div>
-            </div>
+            </details>
 
             <button type="submit" disabled={loading}>
               {loading ? 'Generating...' : 'Generate Prompt'}
