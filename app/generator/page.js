@@ -42,8 +42,6 @@ export default function GeneratorPage() {
   const [customFurnitureType, setCustomFurnitureType] = useState('');
   const [productOptionsByType, setProductOptionsByType] = useState({});
   const [featuredProductsByType, setFeaturedProductsByType] = useState({});
-  const [availableFurnitureTypes, setAvailableFurnitureTypes] = useState([]);
-  const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [roomOptionsLoading, setRoomOptionsLoading] = useState(true);
   const [productOptionsLoading, setProductOptionsLoading] = useState(false);
   const [catalogSource, setCatalogSource] = useState('sheets');
@@ -52,7 +50,6 @@ export default function GeneratorPage() {
   const [error, setError] = useState('');
   const [selectedImageByKey, setSelectedImageByKey] = useState({});
   const [localImageOptionsByKey, setLocalImageOptionsByKey] = useState({});
-  const [localImageStatusByKey, setLocalImageStatusByKey] = useState({});
   const [downloadAllLoading, setDownloadAllLoading] = useState(false);
   const [downloadAllError, setDownloadAllError] = useState('');
 
@@ -90,13 +87,13 @@ export default function GeneratorPage() {
   );
 
   const visibleFurnitureTypes = useMemo(() => {
-    // Show only room types that have products/images, plus any custom types the user added.
+    // Show ALL room furniture types plus any custom types the user added.
     const customTypes = selectedFurnitureTypes.filter(
       (type) => !furnitureOptionsForRoom.includes(type)
     );
-    const merged = [...availableFurnitureTypes, ...customTypes];
+    const merged = [...furnitureOptionsForRoom, ...customTypes];
     return [...new Set(merged)];
-  }, [availableFurnitureTypes, furnitureOptionsForRoom, selectedFurnitureTypes]);
+  }, [furnitureOptionsForRoom, selectedFurnitureTypes]);
 
   const selectedProductByFurnitureType = useMemo(() => {
     const map = {};
@@ -204,28 +201,25 @@ export default function GeneratorPage() {
   }, [filteredRoomOptions]);
 
   useEffect(() => {
-    if (!availableFurnitureTypes.length) {
+    if (!furnitureOptionsForRoom.length) {
       setSelectedFurnitureTypes([]);
       return;
     }
 
-    setSelectedFurnitureTypes(pickRandomSubset(availableFurnitureTypes, 2, 4));
-  }, [availableFurnitureTypes]);
+    setSelectedFurnitureTypes(pickRandomSubset(furnitureOptionsForRoom, 2, 4));
+  }, [furnitureOptionsForRoom]);
 
-  // Load product options for ALL furniture types in the room to determine which have images.
-  // This filters the checkbox list to only types that have a blob/catalog match.
+  // Load product options for ALL furniture types in the room.
   useEffect(() => {
     if (!roomType || !furnitureOptionsForRoom.length) {
       setProductOptionsByType({});
       setFeaturedProductsByType({});
-      setAvailableFurnitureTypes([]);
       return;
     }
 
     let isCancelled = false;
 
     async function loadAllRoomProductOptions() {
-      setAvailabilityLoading(true);
       setProductOptionsLoading(true);
       setError('');
 
@@ -250,12 +244,6 @@ export default function GeneratorPage() {
         setProductOptionsByType(optionsByType);
         setCatalogSource(payload.source || 'sheets');
 
-        // Only expose furniture types that have at least one product or blob image.
-        const available = furnitureOptionsForRoom.filter(
-          (type) => (optionsByType[type] || []).length > 0
-        );
-        setAvailableFurnitureTypes(available);
-
         setFeaturedProductsByType((current) => {
           const next = {};
           for (const type of furnitureOptionsForRoom) {
@@ -270,13 +258,10 @@ export default function GeneratorPage() {
         if (!isCancelled) {
           setProductOptionsByType({});
           setFeaturedProductsByType({});
-          // On error fall back to showing all types so the UI isn't empty.
-          setAvailableFurnitureTypes(furnitureOptionsForRoom);
           setError(err.message);
         }
       } finally {
         if (!isCancelled) {
-          setAvailabilityLoading(false);
           setProductOptionsLoading(false);
         }
       }
@@ -328,7 +313,6 @@ export default function GeneratorPage() {
   useEffect(() => {
     if (!selectedFurnitureTypes.length) {
       setLocalImageOptionsByKey({});
-      setLocalImageStatusByKey({});
       return;
     }
 
@@ -336,7 +320,6 @@ export default function GeneratorPage() {
 
     async function loadLocalImages() {
       const nextOptions = {};
-      const nextStatus = {};
 
       for (const furnitureType of selectedFurnitureTypes) {
         const key = furnitureType;
@@ -358,21 +341,14 @@ export default function GeneratorPage() {
           }
 
           nextOptions[key] = payload.options || [];
-          nextStatus[key] = payload.options?.length
-            ? null
-            : payload.storageSource === 'blob'
-              ? `No Vercel Blob images found for furniture type "${furnitureType}".`
-              : `No local images found for furniture type "${furnitureType}".`;
-        } catch (err) {
+        } catch {
           nextOptions[key] = [];
-          nextStatus[key] = err.message || 'Failed to load local image options.';
         }
       }
 
       if (isCancelled) return;
 
       setLocalImageOptionsByKey(nextOptions);
-      setLocalImageStatusByKey(nextStatus);
       setSelectedImageByKey((current) => {
         const next = { ...current };
 
@@ -416,7 +392,7 @@ export default function GeneratorPage() {
   }, [selectedFurnitureTypes, localImageOptionsByKey]);
 
   function randomizeFurnitureSet() {
-    setSelectedFurnitureTypes(pickRandomSubset(availableFurnitureTypes, 2, 4));
+    setSelectedFurnitureTypes(pickRandomSubset(furnitureOptionsForRoom, 2, 4));
   }
 
   function toggleFurnitureType(type) {
@@ -579,18 +555,14 @@ export default function GeneratorPage() {
                   <button
                     type="button"
                     onClick={randomizeFurnitureSet}
-                    disabled={availabilityLoading || !availableFurnitureTypes.length}
+                    disabled={!furnitureOptionsForRoom.length}
                   >
                     Auto-Select Random Furniture Set
                   </button>
                 </div>
-                {availabilityLoading ? (
+                {!furnitureOptionsForRoom.length ? (
                   <p className="mono" style={{ margin: 0 }}>
-                    Checking available furniture types...
-                  </p>
-                ) : !availableFurnitureTypes.length ? (
-                  <p className="mono" style={{ margin: 0 }}>
-                    No furniture options with images found for this room type.
+                    No furniture options found for this room type.
                   </p>
                 ) : (
                   <div className="checkbox-grid">
@@ -672,7 +644,7 @@ export default function GeneratorPage() {
               </div>
             </div>
 
-            <button type="submit" disabled={loading}>
+            <button type="submit" disabled={loading || selectedFurnitureTypes.length === 0}>
               {loading ? 'Generating...' : 'Generate Prompt'}
             </button>
           </form>
@@ -710,100 +682,120 @@ export default function GeneratorPage() {
           <p className="mono" style={{ margin: 0 }}>
             Select at least one furniture type to load image options.
           </p>
-        ) : (
-          <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
-            {selectedFurnitureTypes.map((furnitureType) => {
-              const key = furnitureType;
-              const selectedProduct = selectedProductByFurnitureType[furnitureType];
-              const imageOptions = localImageOptionsByKey[key] || [];
-              const selectedImage = selectedImageByKey[key] || imageOptions[0]?.filePath || '';
-              const status = localImageStatusByKey[key];
-              const selectedImageOption =
-                imageOptions.find((option) => option.filePath === selectedImage) || null;
-              const selectedImageLabel =
-                selectedImageOption?.relativePath || selectedImageOption?.fileName || selectedImage;
+        ) : (() => {
+          const typesWithImages = selectedFurnitureTypes.filter(
+            (type) => (localImageOptionsByKey[type] || []).length > 0
+          );
+          const typesWithoutImages = selectedFurnitureTypes.filter(
+            (type) => type in localImageOptionsByKey && (localImageOptionsByKey[type] || []).length === 0
+          );
 
-              return (
-                <div key={key} className="card" style={{ background: '#f8faf8' }}>
-                  <div className="row" style={{ justifyContent: 'space-between' }}>
-                    <strong>{furnitureType}</strong>
-                    <span className="mono">{selectedProduct?.handle || 'no-product-handle'}</span>
-                  </div>
-                  <div
-                    style={{
-                      marginTop: '0.6rem',
-                      aspectRatio: '4 / 3',
-                      borderRadius: '0.6rem',
-                      border: '1px solid #d1d5db',
-                      background: '#ffffff',
-                      overflow: 'hidden',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    {selectedImage ? (
-                      <img
-                        src={selectedImage}
-                        alt={`Selected ${furnitureType}`}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <span className="mono" style={{ color: '#6b7280' }}>
-                        No image selected
-                      </span>
-                    )}
-                  </div>
-                  <label htmlFor={`img-${key}`} style={{ marginTop: '0.65rem' }}>
-                    Gallery image
-                  </label>
-                  <select
-                    id={`img-${key}`}
-                    value={selectedImage}
-                    onChange={(event) => setSelectedImage(key, event.target.value)}
-                    disabled={!imageOptions.length}
-                  >
-                    {imageOptions.length ? (
-                      imageOptions.map((option) => (
-                        <option key={option.filePath} value={option.filePath}>
-                          {option.relativePath || option.fileName}
-                        </option>
-                      ))
-                    ) : (
-                      <option value="">No images available</option>
-                    )}
-                  </select>
-                  {selectedImage ? (
-                    <div className="row" style={{ marginTop: '0.5rem' }}>
-                      <a
-                        href={selectedImage}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download
-                        className="mono"
-                      >
-                        Download selected image
-                      </a>
-                      <a href={selectedImage} target="_blank" rel="noopener noreferrer" className="mono">
-                        Open full image
-                      </a>
-                    </div>
-                  ) : null}
-                  {selectedImageLabel ? (
-                    <p className="mono" style={{ margin: '0.5rem 0 0', color: '#14532d' }}>
-                      {selectedImageLabel}
-                    </p>
-                  ) : null}
-                  {status ? (
-                    <p className="mono" style={{ margin: '0.55rem 0 0', color: '#991b1b' }}>
-                      {status}
-                    </p>
-                  ) : null}
+          return (
+            <>
+              {typesWithImages.length > 0 && (
+                <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
+                  {typesWithImages.map((furnitureType) => {
+                    const key = furnitureType;
+                    const selectedProduct = selectedProductByFurnitureType[furnitureType];
+                    const imageOptions = localImageOptionsByKey[key] || [];
+                    const selectedImage = selectedImageByKey[key] || imageOptions[0]?.filePath || '';
+                    const selectedImageOption =
+                      imageOptions.find((option) => option.filePath === selectedImage) || null;
+                    const selectedImageLabel =
+                      selectedImageOption?.relativePath || selectedImageOption?.fileName || selectedImage;
+
+                    return (
+                      <div key={key} className="card" style={{ background: '#f8faf8' }}>
+                        <div className="row" style={{ justifyContent: 'space-between' }}>
+                          <strong>{furnitureType}</strong>
+                          <span className="mono">{selectedProduct?.handle || 'no-product-handle'}</span>
+                        </div>
+                        <div
+                          style={{
+                            marginTop: '0.6rem',
+                            aspectRatio: '4 / 3',
+                            borderRadius: '0.6rem',
+                            border: '1px solid #d1d5db',
+                            background: '#ffffff',
+                            overflow: 'hidden',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          {selectedImage ? (
+                            <img
+                              src={selectedImage}
+                              alt={`Selected ${furnitureType}`}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                          ) : (
+                            <span className="mono" style={{ color: '#6b7280' }}>
+                              No image selected
+                            </span>
+                          )}
+                        </div>
+                        <label htmlFor={`img-${key}`} style={{ marginTop: '0.65rem' }}>
+                          Gallery image
+                        </label>
+                        <select
+                          id={`img-${key}`}
+                          value={selectedImage}
+                          onChange={(event) => setSelectedImage(key, event.target.value)}
+                          disabled={!imageOptions.length}
+                        >
+                          {imageOptions.map((option) => (
+                            <option key={option.filePath} value={option.filePath}>
+                              {option.relativePath || option.fileName}
+                            </option>
+                          ))}
+                        </select>
+                        {selectedImage ? (
+                          <div className="row" style={{ marginTop: '0.5rem' }}>
+                            <a
+                              href={selectedImage}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download
+                              className="mono"
+                            >
+                              Download selected image
+                            </a>
+                            <a href={selectedImage} target="_blank" rel="noopener noreferrer" className="mono">
+                              Open full image
+                            </a>
+                          </div>
+                        ) : null}
+                        {selectedImageLabel ? (
+                          <p className="mono" style={{ margin: '0.5rem 0 0', color: '#14532d' }}>
+                            {selectedImageLabel}
+                          </p>
+                        ) : null}
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
-        )}
+              )}
+
+              {typesWithoutImages.length > 0 && (
+                <details style={{ marginTop: typesWithImages.length > 0 ? '1rem' : 0 }}>
+                  <summary style={{ cursor: 'pointer', fontWeight: 600, padding: '0.6rem 0.75rem', background: '#f1f5f9', borderRadius: '0.4rem', userSelect: 'none' }}>
+                    Furniture without images ({typesWithoutImages.length})
+                  </summary>
+                  <ul className="mono" style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem' }}>
+                    {typesWithoutImages.map((type) => (
+                      <li key={type} style={{ padding: '0.2rem 0' }}>{type}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+
+              {typesWithImages.length === 0 && typesWithoutImages.length === 0 && (
+                <p className="mono" style={{ margin: 0 }}>Loading image options...</p>
+              )}
+            </>
+          );
+        })()}
       </section>
 
       <details style={{ marginTop: '1rem' }}>

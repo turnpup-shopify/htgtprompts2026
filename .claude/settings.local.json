@@ -3,7 +3,8 @@
     "allow": [
       "Bash(cat /Users/alexturney/scripts/claude_projects/htgt-claude/gsc_credentials.json | python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\('type','unknown'\\), list\\(d.keys\\(\\)\\)\\)\"22)",
       "Bash(pip3 install gspread anthropic 2>&1 | tail -5)",
-      "Bash(echo 'none found' find ~/Desktop -name *.jpg -o -name *.png)"
+      "Bash(echo 'none found' find ~/Desktop -name *.jpg -o -name *.png)",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }
