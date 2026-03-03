@@ -552,22 +552,36 @@ export default function GeneratorPage() {
 
             <div>
               <label htmlFor="roomType">Room Type</label>
-              <select
-                id="roomType"
-                value={roomType}
-                onChange={(event) => setRoomType(event.target.value)}
-                disabled={roomOptionsLoading || !filteredRoomOptions.length}
-              >
-                {filteredRoomOptions.length ? (
-                  filteredRoomOptions.map((item) => (
-                    <option key={item.roomType} value={item.roomType}>
-                      {item.roomType}
-                    </option>
-                  ))
-                ) : (
-                  <option value="">No rooms for selected style tag</option>
-                )}
-              </select>
+              <div className="row" style={{ gap: '0.4rem' }}>
+                <select
+                  id="roomType"
+                  value={roomType}
+                  onChange={(event) => setRoomType(event.target.value)}
+                  disabled={roomOptionsLoading || !filteredRoomOptions.length}
+                  style={{ flex: 1 }}
+                >
+                  {filteredRoomOptions.length ? (
+                    filteredRoomOptions.map((item) => (
+                      <option key={item.roomType} value={item.roomType}>
+                        {item.roomType}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">No rooms for selected style tag</option>
+                  )}
+                </select>
+                <button
+                  type="button"
+                  disabled={filteredRoomOptions.length < 2}
+                  onClick={() => {
+                    const others = filteredRoomOptions.filter((r) => r.roomType !== roomType);
+                    setRoomType(others[Math.floor(Math.random() * others.length)].roomType);
+                  }}
+                  style={{ flexShrink: 0 }}
+                >
+                  ↺
+                </button>
+              </div>
             </div>
 
             <div>
