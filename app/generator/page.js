@@ -432,6 +432,17 @@ export default function GeneratorPage() {
     });
   }, [selectedFurnitureTypes, localImageOptionsByKey]);
 
+  function handleClearAll() {
+    setSelectedScene('');
+    setSelectedStyleTag('');
+    setRoomType('');
+    setSelectedFurnitureTypes([]);
+    setFeaturedProductsByType({});
+    setSelectedImageByKey({});
+    setResult(null);
+    setError('');
+  }
+
   function randomizeFurnitureSet() {
     setSelectedFurnitureTypes(pickRandomSubset(furnitureOptionsForRoom, 2, 4));
   }
@@ -575,431 +586,344 @@ export default function GeneratorPage() {
     }
   }
 
-  return (
-    <main>
-      <h1>Deterministic Prompt Generator</h1>
-      <p>
-        Preset slug: <span className="mono">{DEFAULT_PRESET_SLUG}</span>
-      </p>
-      <p className="mono" style={{ marginTop: '-0.5rem' }}>
-        Data mode: {catalogSource === 'shopify' ? 'Shopify catalog' : 'Google Sheets catalog'}.
-      </p>
+  const imageCatalogContent = (() => {
+    if (!selectedFurnitureTypes.length) return null;
 
-      <div className="grid grid-2">
-        <section className="card">
-          <h2>Controls</h2>
-          <form onSubmit={handleGenerate} className="grid">
-            <div>
-              <label htmlFor="styleTag">Style Tag</label>
-              <div className="row" style={{ gap: '0.4rem' }}>
-                <select
-                  id="styleTag"
-                  value={selectedStyleTag}
-                  onChange={(event) => setSelectedStyleTag(event.target.value)}
-                  disabled={roomOptionsLoading || !allStyleTagOptions.length}
-                  style={{ flex: 1 }}
-                >
-                  {allStyleTagOptions.length ? (
-                    allStyleTagOptions.map((tag) => (
-                      <option key={tag} value={tag}>
-                        {tag}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">No style tags available</option>
-                  )}
-                </select>
-                <button
-                  type="button"
-                  disabled={allStyleTagOptions.length < 2}
-                  onClick={() => {
-                    const others = allStyleTagOptions.filter((t) => t !== selectedStyleTag);
-                    setSelectedStyleTag(others[Math.floor(Math.random() * others.length)]);
-                  }}
-                  style={{ flexShrink: 0 }}
-                >
-                  ↺
-                </button>
-              </div>
-            </div>
+    const typesWithImages = selectedFurnitureTypes.filter(
+      (type) => (localImageOptionsByKey[type] || []).length > 0
+    );
+    const typesWithoutImages = selectedFurnitureTypes.filter(
+      (type) => type in localImageOptionsByKey && (localImageOptionsByKey[type] || []).length === 0
+    );
 
-            {sceneOptions.length > 0 && (
-              <div>
-                <label htmlFor="scene">Scene (optional)</label>
-                <div className="row" style={{ gap: '0.4rem' }}>
+    if (typesWithImages.length === 0 && typesWithoutImages.length === 0) {
+      return <p className="mono" style={{ margin: 0, color: '#6b7280' }}>Loading images...</p>;
+    }
+
+    return (
+      <>
+        {typesWithImages.length > 0 && (
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+            {typesWithImages.map((furnitureType) => {
+              const key = furnitureType;
+              const selectedProduct = selectedProductByFurnitureType[furnitureType];
+              const imageOptions = localImageOptionsByKey[key] || [];
+              const selectedImage = selectedImageByKey[key] || imageOptions[0]?.filePath || '';
+              const selectedImageOption = imageOptions.find((o) => o.filePath === selectedImage) || null;
+              const selectedImageLabel = selectedImageOption?.relativePath || selectedImageOption?.fileName || selectedImage;
+
+              return (
+                <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <strong style={{ fontSize: '0.85rem' }}>{furnitureType}</strong>
+                    {selectedProduct?.handle && (
+                      <span className="mono" style={{ fontSize: '0.7rem', color: '#6b7280' }}>{selectedProduct.handle}</span>
+                    )}
+                  </div>
+                  <div style={{ aspectRatio: '4/3', borderRadius: '0.5rem', border: '1px solid #e5e7eb', background: '#f9fafb', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {selectedImage ? (
+                      <img src={selectedImage} alt={furnitureType} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <span className="mono" style={{ fontSize: '0.75rem', color: '#9ca3af' }}>no image</span>
+                    )}
+                  </div>
                   <select
-                    id="scene"
-                    value={selectedScene}
-                    onChange={(event) => setSelectedScene(event.target.value)}
-                    disabled={roomOptionsLoading}
-                    style={{ flex: 1 }}
+                    value={selectedImage}
+                    onChange={(event) => setSelectedImage(key, event.target.value)}
+                    disabled={!imageOptions.length}
+                    style={{ fontSize: '0.8rem' }}
                   >
-                    <option value="">Any scene</option>
-                    {availableScenesForRoom.map((s) => (
-                      <option key={s.scene} value={s.scene}>
-                        {s.scene}
-                        {s.rooms.length === 1 ? ` (${s.rooms[0]})` : ''}
+                    {imageOptions.map((option) => (
+                      <option key={option.filePath} value={option.filePath}>
+                        {option.relativePath || option.fileName}
                       </option>
                     ))}
                   </select>
-                  {selectedScene && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedScene('')}
-                      style={{ flexShrink: 0 }}
-                      title="Clear scene"
-                    >
-                      ✕
-                    </button>
+                  {selectedImage && (
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                      <a href={selectedImage} target="_blank" rel="noopener noreferrer" download className="mono" style={{ fontSize: '0.75rem' }}>Download</a>
+                      <a href={selectedImage} target="_blank" rel="noopener noreferrer" className="mono" style={{ fontSize: '0.75rem' }}>Open</a>
+                    </div>
                   )}
                 </div>
-                {roomAutoLocked && (
-                  <p className="mono" style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', color: '#6b7280' }}>
-                    Room auto-selected from scene
-                  </p>
-                )}
-              </div>
-            )}
+              );
+            })}
+          </div>
+        )}
+        {typesWithoutImages.length > 0 && (
+          <details style={{ marginTop: typesWithImages.length > 0 ? '0.75rem' : 0 }}>
+            <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: '#6b7280', userSelect: 'none' }}>
+              No images: {typesWithoutImages.join(', ')}
+            </summary>
+          </details>
+        )}
+      </>
+    );
+  })();
 
-            <div>
-              <label htmlFor="roomType">Room Type</label>
-              <div className="row" style={{ gap: '0.4rem' }}>
-                <select
-                  id="roomType"
-                  value={roomType}
-                  onChange={(event) => {
-                    setRoomType(event.target.value);
-                    setSelectedScene('');
-                  }}
-                  disabled={roomOptionsLoading || !filteredRoomOptions.length || roomAutoLocked}
-                  style={{ flex: 1 }}
-                >
-                  {filteredRoomOptions.length ? (
-                    filteredRoomOptions.map((item) => (
-                      <option key={item.roomType} value={item.roomType}>
-                        {item.roomType}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">No rooms for selected style tag</option>
-                  )}
-                </select>
-                {!roomAutoLocked && (
+  return (
+    <main>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+        <h1 style={{ margin: 0 }}>Prompt Generator</h1>
+        <span className="mono" style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+          {catalogSource === 'shopify' ? 'Shopify' : 'Sheets'} · {roomOptionsLoading ? 'loading…' : `${roomOptions.length} rooms`}
+        </span>
+      </div>
+
+      <div className="grid grid-2">
+        {/* ── Left: Controls ── */}
+        <section className="card">
+          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h2 style={{ margin: 0 }}>Controls</h2>
+            <button type="button" onClick={handleClearAll} style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem' }}>
+              Clear All
+            </button>
+          </div>
+
+          <form onSubmit={handleGenerate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+            {/* Filters */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {/* Style Tag */}
+              <div>
+                <label htmlFor="styleTag" style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '0.25rem', display: 'block' }}>Style</label>
+                <div className="row" style={{ gap: '0.4rem' }}>
+                  <select
+                    id="styleTag"
+                    value={selectedStyleTag}
+                    onChange={(event) => setSelectedStyleTag(event.target.value)}
+                    disabled={roomOptionsLoading || !allStyleTagOptions.length}
+                    style={{ flex: 1 }}
+                  >
+                    {allStyleTagOptions.length ? (
+                      allStyleTagOptions.map((tag) => <option key={tag} value={tag}>{tag}</option>)
+                    ) : (
+                      <option value="">No style tags available</option>
+                    )}
+                  </select>
                   <button
                     type="button"
-                    disabled={filteredRoomOptions.length < 2}
+                    disabled={allStyleTagOptions.length < 2}
                     onClick={() => {
-                      const others = filteredRoomOptions.filter((r) => r.roomType !== roomType);
-                      setRoomType(others[Math.floor(Math.random() * others.length)].roomType);
-                      setSelectedScene('');
+                      const others = allStyleTagOptions.filter((t) => t !== selectedStyleTag);
+                      setSelectedStyleTag(others[Math.floor(Math.random() * others.length)]);
                     }}
                     style={{ flexShrink: 0 }}
+                    title="Random style"
+                  >↺</button>
+                </div>
+              </div>
+
+              {/* Scene */}
+              {sceneOptions.length > 0 && (
+                <div>
+                  <label htmlFor="scene" style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '0.25rem', display: 'block' }}>
+                    Scene{selectedScene ? '' : ' — optional'}
+                    {roomAutoLocked && <span style={{ marginLeft: '0.5rem', color: '#9ca3af' }}>· room auto-selected</span>}
+                  </label>
+                  <div className="row" style={{ gap: '0.4rem' }}>
+                    <select
+                      id="scene"
+                      value={selectedScene}
+                      onChange={(event) => setSelectedScene(event.target.value)}
+                      disabled={roomOptionsLoading}
+                      style={{ flex: 1 }}
+                    >
+                      <option value="">Any</option>
+                      {availableScenesForRoom.map((s) => (
+                        <option key={s.scene} value={s.scene}>
+                          {s.scene}{s.rooms.length === 1 ? ` — ${s.rooms[0]}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedScene && (
+                      <button type="button" onClick={() => setSelectedScene('')} style={{ flexShrink: 0 }} title="Clear scene">✕</button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Room */}
+              <div>
+                <label htmlFor="roomType" style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '0.25rem', display: 'block' }}>Room</label>
+                <div className="row" style={{ gap: '0.4rem' }}>
+                  <select
+                    id="roomType"
+                    value={roomType}
+                    onChange={(event) => { setRoomType(event.target.value); setSelectedScene(''); }}
+                    disabled={roomOptionsLoading || !filteredRoomOptions.length || roomAutoLocked}
+                    style={{ flex: 1 }}
                   >
-                    ↺
-                  </button>
-                )}
+                    {filteredRoomOptions.length ? (
+                      filteredRoomOptions.map((item) => <option key={item.roomType} value={item.roomType}>{item.roomType}</option>)
+                    ) : (
+                      <option value="">No rooms available</option>
+                    )}
+                  </select>
+                  {!roomAutoLocked && (
+                    <button
+                      type="button"
+                      disabled={filteredRoomOptions.length < 2}
+                      onClick={() => {
+                        const others = filteredRoomOptions.filter((r) => r.roomType !== roomType);
+                        setRoomType(others[Math.floor(Math.random() * others.length)].roomType);
+                        setSelectedScene('');
+                      }}
+                      style={{ flexShrink: 0 }}
+                      title="Random room"
+                    >↺</button>
+                  )}
+                </div>
               </div>
             </div>
 
+            {/* Divider */}
+            <hr style={{ border: 'none', borderTop: '1px solid #e5e7eb', margin: 0 }} />
+
+            {/* Furniture */}
             <div>
-              <label>Furniture Options (from room_to_furniture sheet)</label>
-              <div className="card" style={{ background: '#f8faf8', padding: '0.75rem' }}>
-                <div className="row" style={{ marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.4rem' }}>
-                  <button
-                    type="button"
-                    onClick={randomizeFurnitureSet}
-                    disabled={!furnitureOptionsForRoom.length}
-                  >
-                    Auto-Select Random Furniture Set
-                  </button>
-                  <button
-                    type="button"
-                    onClick={selectAllFurniture}
-                    disabled={!visibleFurnitureTypes.length}
-                  >
-                    Select All
-                  </button>
-                  <button
-                    type="button"
-                    onClick={clearAllFurniture}
-                    disabled={!selectedFurnitureTypes.length}
-                  >
-                    Clear All
-                  </button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <label style={{ fontSize: '0.8rem', color: '#6b7280', margin: 0 }}>Furniture</label>
+                <div className="row" style={{ gap: '0.3rem' }}>
+                  <button type="button" onClick={randomizeFurnitureSet} disabled={!furnitureOptionsForRoom.length} style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem' }} title="Pick random set">↺ Random</button>
+                  <button type="button" onClick={selectAllFurniture} disabled={!visibleFurnitureTypes.length} style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem' }}>All</button>
+                  <button type="button" onClick={clearAllFurniture} disabled={!selectedFurnitureTypes.length} style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem' }}>None</button>
                 </div>
-                {!furnitureOptionsForRoom.length ? (
-                  <p className="mono" style={{ margin: 0 }}>
-                    No furniture options found for this room type.
-                  </p>
-                ) : (
-                  <div className="checkbox-grid">
-                    {visibleFurnitureTypes.map((type) => (
-                      <label key={type} className="checkbox-item">
-                        <input
-                          type="checkbox"
-                          checked={selectedFurnitureTypes.includes(type)}
-                          onChange={() => toggleFurnitureType(type)}
-                        />{' '}
-                        {type}
-                      </label>
-                    ))}
-                  </div>
-                )}
-                <div className="row" style={{ marginTop: '0.75rem' }}>
-                  <input
-                    value={customFurnitureType}
-                    onChange={(event) => setCustomFurnitureType(event.target.value)}
-                    placeholder="add custom furniture type (e.g. accent tables)"
-                  />
-                  <button type="button" onClick={addCustomFurnitureType}>
-                    Add
-                  </button>
+              </div>
+
+              {!furnitureOptionsForRoom.length ? (
+                <p className="mono" style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>Select a room first.</p>
+              ) : (
+                <div className="checkbox-grid">
+                  {visibleFurnitureTypes.map((type) => (
+                    <label key={type} className="checkbox-item">
+                      <input type="checkbox" checked={selectedFurnitureTypes.includes(type)} onChange={() => toggleFurnitureType(type)} />{' '}{type}
+                    </label>
+                  ))}
                 </div>
+              )}
+
+              <div className="row" style={{ marginTop: '0.6rem', gap: '0.4rem' }}>
+                <input
+                  value={customFurnitureType}
+                  onChange={(event) => setCustomFurnitureType(event.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomFurnitureType(); } }}
+                  placeholder="Add custom type…"
+                  style={{ fontSize: '0.85rem' }}
+                />
+                <button type="button" onClick={addCustomFurnitureType} style={{ flexShrink: 0 }}>Add</button>
               </div>
             </div>
 
+            {/* Featured Products */}
             <details>
-              <summary style={{ cursor: 'pointer', fontWeight: 600, userSelect: 'none', marginBottom: '0.5rem' }}>
-                Featured Product Selection (optional)
+              <summary style={{ cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, userSelect: 'none', color: '#374151' }}>
+                Pin products{selectedFurnitureTypes.some((t) => featuredProductsByType[t]) ? ' ·' : ' — optional'}
+                {selectedFurnitureTypes.some((t) => featuredProductsByType[t]) && (
+                  <span style={{ color: '#6b7280', fontWeight: 400 }}>
+                    {' '}{selectedFurnitureTypes.filter((t) => featuredProductsByType[t]).length} pinned
+                  </span>
+                )}
               </summary>
-              <div className="card" style={{ background: '#f8faf8', padding: '0.75rem' }}>
+              <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {productOptionsLoading ? (
-                  <p className="mono" style={{ margin: 0 }}>
-                    Loading product options...
-                  </p>
+                  <p className="mono" style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>Loading…</p>
                 ) : selectedFurnitureTypes.length === 0 ? (
-                  <p className="mono" style={{ margin: 0 }}>
-                    Select furniture types to choose featured products.
-                  </p>
+                  <p className="mono" style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>Select furniture types first.</p>
                 ) : (
-                  <div className="grid">
-                    {selectedFurnitureTypes.map((type) => {
-                      const options = productOptionsByType[type] || [];
-
-                      return (
-                        <div key={type}>
-                          <label htmlFor={`featured-${type}`}>{type}</label>
-                          <select
-                            id={`featured-${type}`}
-                            value={featuredProductsByType[type] || ''}
-                            onChange={(event) => setFeaturedProduct(type, event.target.value)}
-                          >
-                            <option value="">Auto Pick (deterministic)</option>
-                            {options.map((option) => (
-                              <option
-                                key={option.shopify_product_id}
-                                value={option.shopify_product_id}
-                              >
-                                {option.title}
-                                {option.catalog_origin === 'blob'
-                                  ? ' (blob)'
-                                  : option.catalog_origin === 'local'
-                                    ? ' (local folder)'
-                                    : ''}
-                                {option.in_stock ? '' : ' (out of stock)'}
-                              </option>
-                            ))}
-                          </select>
-                          {options.length === 0 ? (
-                            <p className="mono" style={{ margin: '0.35rem 0 0' }}>
-                              No catalog products found for this product type. Check your `products` sheet `product_type` values.
-                            </p>
-                          ) : null}
-                        </div>
-                      );
-                    })}
-                  </div>
+                  selectedFurnitureTypes.map((type) => {
+                    const options = productOptionsByType[type] || [];
+                    return (
+                      <div key={type}>
+                        <label htmlFor={`featured-${type}`} style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '0.2rem', display: 'block' }}>{type}</label>
+                        <select
+                          id={`featured-${type}`}
+                          value={featuredProductsByType[type] || ''}
+                          onChange={(event) => setFeaturedProduct(type, event.target.value)}
+                        >
+                          <option value="">Auto-pick</option>
+                          {options.map((option) => (
+                            <option key={option.shopify_product_id} value={option.shopify_product_id}>
+                              {option.title}{option.catalog_origin === 'blob' ? ' (blob)' : option.catalog_origin === 'local' ? ' (local)' : ''}{option.in_stock ? '' : ' (OOS)'}
+                            </option>
+                          ))}
+                        </select>
+                        {options.length === 0 && (
+                          <p className="mono" style={{ margin: '0.2rem 0 0', fontSize: '0.75rem', color: '#9ca3af' }}>No products found for this type.</p>
+                        )}
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </details>
 
-            <button
-              type="button"
-              onClick={handleMixItUp}
-              disabled={roomOptions.length < 2}
-              style={{ background: '#1e3a5f', color: '#fff' }}
-            >
-              Crossmix (random row per column)
-            </button>
+            {/* Actions */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
+              <button type="submit" disabled={loading} style={{ fontWeight: 600 }}>
+                {loading ? 'Generating…' : 'Generate Prompt'}
+              </button>
+              <button
+                type="button"
+                onClick={handleMixItUp}
+                disabled={roomOptions.length < 2}
+                style={{ background: '#1e3a5f', color: '#fff' }}
+              >
+                Crossmix
+              </button>
+            </div>
 
-            <button type="submit" disabled={loading}>
-              {loading ? 'Generating...' : 'Generate Prompt'}
-            </button>
+            {error && <p style={{ color: '#991b1b', margin: 0, fontSize: '0.875rem' }}>{error}</p>}
           </form>
-          {error ? <p style={{ color: '#991b1b', marginTop: '1rem' }}>{error}</p> : null}
         </section>
 
-        <section className="card">
-          <h2>Prompt Output</h2>
-          <textarea
-            readOnly
-            value={result?.prompt || ''}
-            placeholder="Generated prompt appears here..."
-          />
-          <button
-            type="button"
-            onClick={handleDownloadAllSelectedImages}
-            disabled={!canDownloadAllSelectedImages || downloadAllLoading}
-            style={{ marginTop: '0.75rem' }}
-          >
-            {downloadAllLoading
-              ? `Downloading ${selectedImagesForPrompt.length} image(s)...`
-              : `Download All Selected Images (${selectedImagesForPrompt.length})`}
-          </button>
-          {downloadAllError ? (
-            <p className="mono" style={{ color: '#991b1b', marginTop: '0.55rem', marginBottom: 0 }}>
-              {downloadAllError}
-            </p>
-          ) : null}
-        </section>
+        {/* ── Right: Output + Images ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <section className="card">
+            <h2 style={{ marginTop: 0 }}>Prompt Output</h2>
+            <textarea
+              readOnly
+              value={result?.prompt || ''}
+              placeholder="Generated prompt will appear here…"
+            />
+            {result?.prompt && (
+              <div style={{ marginTop: '0.6rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={handleDownloadAllSelectedImages}
+                  disabled={!canDownloadAllSelectedImages || downloadAllLoading}
+                >
+                  {downloadAllLoading
+                    ? `Downloading ${selectedImagesForPrompt.length}…`
+                    : `Download images (${selectedImagesForPrompt.length})`}
+                </button>
+                {downloadAllError && (
+                  <span className="mono" style={{ color: '#991b1b', fontSize: '0.8rem' }}>{downloadAllError}</span>
+                )}
+              </div>
+            )}
+          </section>
+
+          {imageCatalogContent && (
+            <section className="card">
+              <h2 style={{ marginTop: 0, marginBottom: '0.75rem' }}>Images</h2>
+              {imageCatalogContent}
+            </section>
+          )}
+        </div>
       </div>
 
-      <section className="card" style={{ marginTop: '1rem' }}>
-        <h2>Image Catalog Options</h2>
-        {!selectedFurnitureTypes.length ? (
-          <p className="mono" style={{ margin: 0 }}>
-            Select at least one furniture type to load image options.
-          </p>
-        ) : (() => {
-          const typesWithImages = selectedFurnitureTypes.filter(
-            (type) => (localImageOptionsByKey[type] || []).length > 0
-          );
-          const typesWithoutImages = selectedFurnitureTypes.filter(
-            (type) => type in localImageOptionsByKey && (localImageOptionsByKey[type] || []).length === 0
-          );
-
-          return (
-            <>
-              {typesWithImages.length > 0 && (
-                <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
-                  {typesWithImages.map((furnitureType) => {
-                    const key = furnitureType;
-                    const selectedProduct = selectedProductByFurnitureType[furnitureType];
-                    const imageOptions = localImageOptionsByKey[key] || [];
-                    const selectedImage = selectedImageByKey[key] || imageOptions[0]?.filePath || '';
-                    const selectedImageOption =
-                      imageOptions.find((option) => option.filePath === selectedImage) || null;
-                    const selectedImageLabel =
-                      selectedImageOption?.relativePath || selectedImageOption?.fileName || selectedImage;
-
-                    return (
-                      <div key={key} className="card" style={{ background: '#f8faf8' }}>
-                        <div className="row" style={{ justifyContent: 'space-between' }}>
-                          <strong>{furnitureType}</strong>
-                          <span className="mono">{selectedProduct?.handle || 'no-product-handle'}</span>
-                        </div>
-                        <div
-                          style={{
-                            marginTop: '0.6rem',
-                            aspectRatio: '4 / 3',
-                            borderRadius: '0.6rem',
-                            border: '1px solid #d1d5db',
-                            background: '#ffffff',
-                            overflow: 'hidden',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}
-                        >
-                          {selectedImage ? (
-                            <img
-                              src={selectedImage}
-                              alt={`Selected ${furnitureType}`}
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            />
-                          ) : (
-                            <span className="mono" style={{ color: '#6b7280' }}>
-                              No image selected
-                            </span>
-                          )}
-                        </div>
-                        <label htmlFor={`img-${key}`} style={{ marginTop: '0.65rem' }}>
-                          Gallery image
-                        </label>
-                        <select
-                          id={`img-${key}`}
-                          value={selectedImage}
-                          onChange={(event) => setSelectedImage(key, event.target.value)}
-                          disabled={!imageOptions.length}
-                        >
-                          {imageOptions.map((option) => (
-                            <option key={option.filePath} value={option.filePath}>
-                              {option.relativePath || option.fileName}
-                            </option>
-                          ))}
-                        </select>
-                        {selectedImage ? (
-                          <div className="row" style={{ marginTop: '0.5rem' }}>
-                            <a
-                              href={selectedImage}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              download
-                              className="mono"
-                            >
-                              Download selected image
-                            </a>
-                            <a href={selectedImage} target="_blank" rel="noopener noreferrer" className="mono">
-                              Open full image
-                            </a>
-                          </div>
-                        ) : null}
-                        {selectedImageLabel ? (
-                          <p className="mono" style={{ margin: '0.5rem 0 0', color: '#14532d' }}>
-                            {selectedImageLabel}
-                          </p>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {typesWithoutImages.length > 0 && (
-                <details style={{ marginTop: typesWithImages.length > 0 ? '1rem' : 0 }}>
-                  <summary style={{ cursor: 'pointer', fontWeight: 600, padding: '0.6rem 0.75rem', background: '#f1f5f9', borderRadius: '0.4rem', userSelect: 'none' }}>
-                    Furniture without images ({typesWithoutImages.length})
-                  </summary>
-                  <ul className="mono" style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem' }}>
-                    {typesWithoutImages.map((type) => (
-                      <li key={type} style={{ padding: '0.2rem 0' }}>{type}</li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-
-              {typesWithImages.length === 0 && typesWithoutImages.length === 0 && (
-                <p className="mono" style={{ margin: 0 }}>Loading image options...</p>
-              )}
-            </>
-          );
-        })()}
-      </section>
-
+      {/* Debug */}
       <details style={{ marginTop: '1rem' }}>
-        <summary style={{ cursor: 'pointer', fontWeight: 600, padding: '0.75rem 1rem', background: '#f1f5f9', borderRadius: '0.5rem', userSelect: 'none' }}>
-          Debug Panel
+        <summary style={{ cursor: 'pointer', fontWeight: 600, padding: '0.6rem 0.75rem', background: '#f1f5f9', borderRadius: '0.5rem', userSelect: 'none', fontSize: '0.85rem' }}>
+          Debug
         </summary>
         <section className="card" style={{ marginTop: '0.5rem' }}>
-          <pre className="mono" style={{ overflowX: 'auto', margin: 0 }}>
+          <pre className="mono" style={{ overflowX: 'auto', margin: 0, fontSize: '0.75rem' }}>
             {JSON.stringify(
-              result
-                ? {
-                    input: result.input,
-                    selectedProduct: result.selectedProduct,
-                    selectedProducts: result.selectedProducts,
-                    scoreBreakdown: result.scoreBreakdown,
-                    debug: result.debug
-                  }
-                : {
-                    input: null,
-                    selectedProduct: null,
-                    selectedProducts: null,
-                    scoreBreakdown: null,
-                    debug: null
-                  },
-              null,
-              2
+              result ? { input: result.input, selectedProduct: result.selectedProduct, selectedProducts: result.selectedProducts, scoreBreakdown: result.scoreBreakdown, debug: result.debug }
+                     : { input: null, selectedProduct: null, selectedProducts: null, scoreBreakdown: null, debug: null },
+              null, 2
             )}
           </pre>
         </section>
