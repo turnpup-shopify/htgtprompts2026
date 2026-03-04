@@ -54,6 +54,20 @@ export default function GeneratorPage() {
   const [localImageOptionsByKey, setLocalImageOptionsByKey] = useState({});
   const [downloadAllLoading, setDownloadAllLoading] = useState(false);
   const [downloadAllError, setDownloadAllError] = useState('');
+  const [variationSeed, setVariationSeed] = useState(0);
+  const [copied, setCopied] = useState(false);
+  const [promptHistory, setPromptHistory] = useState([]);
+  const [savedPrompts, setSavedPrompts] = useState([]);
+  const [batchResults, setBatchResults] = useState([]);
+  const [batchLoading, setBatchLoading] = useState(false);
+
+  // Load saved prompts from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('htgt_saved_prompts') || '[]');
+      setSavedPrompts(stored);
+    } catch {}
+  }, []);
 
   // Holds furniture from a cross-row mix; tells the furnitureOptionsForRoom effect to
   // skip its normal randomisation so the mixed selection survives the room-type change.
@@ -554,37 +568,98 @@ export default function GeneratorPage() {
     }
   }
 
+  async function runGenerate(seed) {
+    const response = await fetch('/api/generate-prompt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        presetSlug: DEFAULT_PRESET_SLUG,
+        roomType,
+        scene: selectedScene || undefined,
+        furnitureTypes: selectedFurnitureTypes,
+        featuredProductsByType,
+        styleTags: selectedStyleTag ? [selectedStyleTag] : [],
+        variationSeed: seed
+      })
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'Failed to generate prompt');
+    return payload;
+  }
+
   async function handleGenerate(event) {
     event.preventDefault();
     setLoading(true);
     setError('');
-
     try {
-      const response = await fetch('/api/generate-prompt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          presetSlug: DEFAULT_PRESET_SLUG,
-          roomType,
-          scene: selectedScene || undefined,
-          furnitureTypes: selectedFurnitureTypes,
-          featuredProductsByType,
-          styleTags: selectedStyleTag ? [selectedStyleTag] : []
-        })
-      });
-
-      const payload = await response.json();
-
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error || 'Failed to generate prompt');
-      }
-
+      const payload = await runGenerate(variationSeed);
       setResult(payload);
+      setPromptHistory((prev) => [
+        { id: Date.now(), prompt: payload.prompt, input: payload.input, seed: variationSeed },
+        ...prev.slice(0, 9)
+      ]);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleVariation() {
+    const nextSeed = variationSeed + 1;
+    setVariationSeed(nextSeed);
+    setLoading(true);
+    setError('');
+    try {
+      const payload = await runGenerate(nextSeed);
+      setResult(payload);
+      setPromptHistory((prev) => [
+        { id: Date.now(), prompt: payload.prompt, input: payload.input, seed: nextSeed },
+        ...prev.slice(0, 9)
+      ]);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleBatchGenerate() {
+    setBatchLoading(true);
+    setBatchResults([]);
+    setError('');
+    try {
+      const results = await Promise.all(
+        [0, 1, 2, 3, 4].map((s) => runGenerate(s).catch((err) => ({ error: err.message })))
+      );
+      setBatchResults(results);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBatchLoading(false);
+    }
+  }
+
+  async function handleCopyPrompt(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {}
+  }
+
+  function toggleSavePrompt(promptText) {
+    setSavedPrompts((prev) => {
+      const next = prev.some((p) => p.text === promptText)
+        ? prev.filter((p) => p.text !== promptText)
+        : [{ id: Date.now(), text: promptText }, ...prev];
+      try { localStorage.setItem('htgt_saved_prompts', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }
+
+  function isPromptSaved(text) {
+    return savedPrompts.some((p) => p.text === text);
   }
 
   const imageCatalogContent = (() => {
@@ -790,11 +865,15 @@ export default function GeneratorPage() {
                 <p className="mono" style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>Select a room first.</p>
               ) : (
                 <div className="checkbox-grid">
-                  {visibleFurnitureTypes.map((type) => (
-                    <label key={type} className="checkbox-item">
-                      <input type="checkbox" checked={selectedFurnitureTypes.includes(type)} onChange={() => toggleFurnitureType(type)} />{' '}{type}
-                    </label>
-                  ))}
+                  {visibleFurnitureTypes.map((type) => {
+                    const count = (productOptionsByType[type] || []).length;
+                    return (
+                      <label key={type} className="checkbox-item">
+                        <input type="checkbox" checked={selectedFurnitureTypes.includes(type)} onChange={() => toggleFurnitureType(type)} />{' '}{type}
+                        {count > 0 && <span style={{ marginLeft: '0.3rem', fontSize: '0.7rem', color: '#9ca3af' }}>({count})</span>}
+                      </label>
+                    );
+                  })}
                 </div>
               )}
 
@@ -855,17 +934,38 @@ export default function GeneratorPage() {
 
             {/* Actions */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
-              <button type="submit" disabled={loading} style={{ fontWeight: 600 }}>
-                {loading ? 'Generating…' : 'Generate Prompt'}
-              </button>
-              <button
-                type="button"
-                onClick={handleMixItUp}
-                disabled={roomOptions.length < 2}
-                style={{ background: '#1e3a5f', color: '#fff' }}
-              >
-                Crossmix
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type="submit" disabled={loading || batchLoading} style={{ fontWeight: 600, flex: 1 }}>
+                  {loading ? 'Generating…' : 'Generate'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleVariation}
+                  disabled={loading || batchLoading || !result}
+                  title={`Variation ${variationSeed + 1} — same settings, different products`}
+                  style={{ flexShrink: 0 }}
+                >
+                  ↺ Variation
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={handleBatchGenerate}
+                  disabled={loading || batchLoading}
+                  style={{ flex: 1 }}
+                >
+                  {batchLoading ? 'Generating 5…' : 'Batch × 5'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleMixItUp}
+                  disabled={roomOptions.length < 2 || loading || batchLoading}
+                  style={{ background: '#1e3a5f', color: '#fff', flexShrink: 0 }}
+                >
+                  Crossmix
+                </button>
+              </div>
             </div>
 
             {error && <p style={{ color: '#991b1b', margin: 0, fontSize: '0.875rem' }}>{error}</p>}
@@ -875,14 +975,45 @@ export default function GeneratorPage() {
         {/* ── Right: Output + Images ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <section className="card">
-            <h2 style={{ marginTop: 0 }}>Prompt Output</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+              <h2 style={{ margin: 0 }}>Prompt Output</h2>
+              <div style={{ display: 'flex', gap: '0.4rem' }}>
+                <a
+                  href="https://higgsfield.ai/image/nano_banana_2"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem', background: '#1e3a5f', color: '#fff', borderRadius: '0.35rem', textDecoration: 'none', fontWeight: 600 }}
+                >
+                  Generate ↗
+                </a>
+                <a
+                  href="https://turnpup-shopify.github.io/prompts/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem', background: '#f1f5f9', color: '#374151', borderRadius: '0.35rem', textDecoration: 'none', fontWeight: 600 }}
+                >
+                  More prompts ↗
+                </a>
+              </div>
+            </div>
             <textarea
               readOnly
               value={result?.prompt || ''}
               placeholder="Generated prompt will appear here…"
             />
             {result?.prompt && (
-              <div style={{ marginTop: '0.6rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <div style={{ marginTop: '0.6rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => handleCopyPrompt(result.prompt)} style={{ flexShrink: 0 }}>
+                  {copied ? 'Copied!' : 'Copy'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleSavePrompt(result.prompt)}
+                  title={isPromptSaved(result.prompt) ? 'Remove from saved' : 'Save prompt'}
+                  style={{ flexShrink: 0, background: isPromptSaved(result.prompt) ? '#fef9c3' : undefined }}
+                >
+                  {isPromptSaved(result.prompt) ? '★ Saved' : '☆ Save'}
+                </button>
                 <button
                   type="button"
                   onClick={handleDownloadAllSelectedImages}
@@ -907,6 +1038,91 @@ export default function GeneratorPage() {
           )}
         </div>
       </div>
+
+      {/* Batch results */}
+      {batchResults.length > 0 && (
+        <section className="card" style={{ marginTop: '1rem' }}>
+          <h2 style={{ marginTop: 0, marginBottom: '0.75rem' }}>Batch Results</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {batchResults.map((r, i) => (
+              <div key={i} style={{ background: '#f8faf8', borderRadius: '0.5rem', padding: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                  <span style={{ fontSize: '0.8rem', color: '#6b7280', fontWeight: 600 }}>Variation {i + 1}</span>
+                  {r.prompt && (
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <button type="button" onClick={() => handleCopyPrompt(r.prompt)} style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem' }}>Copy</button>
+                      <button
+                        type="button"
+                        onClick={() => toggleSavePrompt(r.prompt)}
+                        style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem', background: isPromptSaved(r.prompt) ? '#fef9c3' : undefined }}
+                      >
+                        {isPromptSaved(r.prompt) ? '★' : '☆'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {r.error
+                  ? <p className="mono" style={{ margin: 0, color: '#991b1b', fontSize: '0.8rem' }}>{r.error}</p>
+                  : <p style={{ margin: 0, fontSize: '0.82rem', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{r.prompt}</p>
+                }
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Prompt history */}
+      {promptHistory.length > 0 && (
+        <details style={{ marginTop: '1rem' }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 600, padding: '0.6rem 0.75rem', background: '#f1f5f9', borderRadius: '0.5rem', userSelect: 'none', fontSize: '0.85rem' }}>
+            History ({promptHistory.length})
+          </summary>
+          <section className="card" style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            {promptHistory.map((item) => (
+              <div key={item.id} style={{ background: '#f8faf8', borderRadius: '0.5rem', padding: '0.65rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                  <span className="mono" style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+                    {item.input?.roomType || '—'}{item.input?.scene ? ` · ${item.input.scene}` : ''} · v{item.seed + 1}
+                  </span>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <button type="button" onClick={() => handleCopyPrompt(item.prompt)} style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem' }}>Copy</button>
+                    <button
+                      type="button"
+                      onClick={() => toggleSavePrompt(item.prompt)}
+                      style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem', background: isPromptSaved(item.prompt) ? '#fef9c3' : undefined }}
+                    >
+                      {isPromptSaved(item.prompt) ? '★' : '☆'}
+                    </button>
+                  </div>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.8rem', whiteSpace: 'pre-wrap', lineHeight: 1.5, color: '#374151' }}>{item.prompt}</p>
+              </div>
+            ))}
+          </section>
+        </details>
+      )}
+
+      {/* Saved prompts */}
+      {savedPrompts.length > 0 && (
+        <details style={{ marginTop: '1rem' }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 600, padding: '0.6rem 0.75rem', background: '#fef9c3', borderRadius: '0.5rem', userSelect: 'none', fontSize: '0.85rem' }}>
+            ★ Saved ({savedPrompts.length})
+          </summary>
+          <section className="card" style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            {savedPrompts.map((item) => (
+              <div key={item.id} style={{ background: '#fefce8', borderRadius: '0.5rem', padding: '0.65rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.35rem' }}>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <button type="button" onClick={() => handleCopyPrompt(item.text)} style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem' }}>Copy</button>
+                    <button type="button" onClick={() => toggleSavePrompt(item.text)} style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem' }}>★ Remove</button>
+                  </div>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.8rem', whiteSpace: 'pre-wrap', lineHeight: 1.5, color: '#374151' }}>{item.text}</p>
+              </div>
+            ))}
+          </section>
+        </details>
+      )}
 
       {/* Debug */}
       <details style={{ marginTop: '1rem' }}>

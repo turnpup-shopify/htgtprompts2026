@@ -115,6 +115,7 @@ export async function POST(request) {
     }
 
     const requestedScene = String(body.scene || '').trim();
+    const variationSeed = Number.isFinite(Number(body.variationSeed)) ? Number(body.variationSeed) : 0;
 
     const masterRows = await getMasterRows();
     const masterRow = findMasterRowByRoom(requestedRoomType, masterRows, requestedScene);
@@ -172,7 +173,8 @@ export async function POST(request) {
     const seed = [
       preset?.slug || String(presetSlug || DEFAULT_PRESET_SLUG),
       requestedRoomType,
-      requestedStyleTags.join(',')
+      requestedStyleTags.join(','),
+      String(variationSeed)
     ].join('|');
 
     const selectedProducts = [];
