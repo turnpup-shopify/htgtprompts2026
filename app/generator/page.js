@@ -75,8 +75,7 @@ export default function GeneratorPage() {
 
   const filteredRoomOptions = useMemo(() => {
     let options = roomOptions;
-    if (allStyleTagOptions.length) {
-      if (!selectedStyleTag) return [];
+    if (allStyleTagOptions.length && selectedStyleTag) {
       options = options.filter((item) => {
         const tags = Array.isArray(item?.styleTags) ? item.styleTags : [];
         return tags.includes(selectedStyleTag);
@@ -208,9 +207,10 @@ export default function GeneratorPage() {
       return;
     }
 
-    setSelectedStyleTag((current) =>
-      allStyleTagOptions.includes(current) ? current : allStyleTagOptions[0]
-    );
+    setSelectedStyleTag((current) => {
+      if (current === '') return '';
+      return allStyleTagOptions.includes(current) ? current : allStyleTagOptions[0];
+    });
   }, [roomOptions, allStyleTagOptions]);
 
   useEffect(() => {
@@ -695,11 +695,8 @@ export default function GeneratorPage() {
                     disabled={roomOptionsLoading || !allStyleTagOptions.length}
                     style={{ flex: 1 }}
                   >
-                    {allStyleTagOptions.length ? (
-                      allStyleTagOptions.map((tag) => <option key={tag} value={tag}>{tag}</option>)
-                    ) : (
-                      <option value="">No style tags available</option>
-                    )}
+                    <option value="">Any style</option>
+                    {allStyleTagOptions.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
                   </select>
                   <button
                     type="button"
