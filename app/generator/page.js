@@ -36,6 +36,8 @@ function filenameFromUrl(url, fallback = 'image') {
 
 export default function GeneratorPage() {
   const [roomOptions, setRoomOptions] = useState([]);
+  const [sceneOptions, setSceneOptions] = useState([]);
+  const [selectedScene, setSelectedScene] = useState('');
   const [selectedStyleTag, setSelectedStyleTag] = useState('');
   const [roomType, setRoomType] = useState('');
   const [selectedFurnitureTypes, setSelectedFurnitureTypes] = useState([]);
@@ -72,13 +74,32 @@ export default function GeneratorPage() {
   }, [roomOptions]);
 
   const filteredRoomOptions = useMemo(() => {
-    if (!allStyleTagOptions.length) return roomOptions;
-    if (!selectedStyleTag) return [];
-    return roomOptions.filter((item) => {
-      const tags = Array.isArray(item?.styleTags) ? item.styleTags : [];
-      return tags.includes(selectedStyleTag);
-    });
-  }, [roomOptions, allStyleTagOptions, selectedStyleTag]);
+    let options = roomOptions;
+    if (allStyleTagOptions.length) {
+      if (!selectedStyleTag) return [];
+      options = options.filter((item) => {
+        const tags = Array.isArray(item?.styleTags) ? item.styleTags : [];
+        return tags.includes(selectedStyleTag);
+      });
+    }
+    if (selectedScene) {
+      const sceneEntry = sceneOptions.find((s) => s.scene === selectedScene);
+      const sceneRooms = sceneEntry?.rooms || [];
+      options = options.filter((item) => sceneRooms.includes(item.roomType));
+    }
+    return options;
+  }, [roomOptions, allStyleTagOptions, selectedStyleTag, selectedScene, sceneOptions]);
+
+  const availableScenesForRoom = useMemo(() => {
+    if (!roomType) return sceneOptions;
+    return sceneOptions.filter((s) => s.rooms.includes(roomType));
+  }, [sceneOptions, roomType]);
+
+  const roomAutoLocked = useMemo(() => {
+    if (!selectedScene) return false;
+    const sceneEntry = sceneOptions.find((s) => s.scene === selectedScene);
+    return (sceneEntry?.rooms || []).length === 1;
+  }, [selectedScene, sceneOptions]);
 
   const selectedRoomOption = useMemo(
     () => filteredRoomOptions.find((item) => item.roomType === roomType) || null,
@@ -165,6 +186,7 @@ export default function GeneratorPage() {
 
         const options = payload.roomOptions || [];
         setRoomOptions(options);
+        setSceneOptions(payload.sceneOptions || []);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -203,6 +225,14 @@ export default function GeneratorPage() {
         : filteredRoomOptions[0].roomType
     );
   }, [filteredRoomOptions]);
+
+  // When scene maps to exactly one room, auto-select it.
+  useEffect(() => {
+    if (!roomAutoLocked) return;
+    const sceneEntry = sceneOptions.find((s) => s.scene === selectedScene);
+    const onlyRoom = sceneEntry?.rooms[0];
+    if (onlyRoom) setRoomType(onlyRoom);
+  }, [roomAutoLocked, selectedScene, sceneOptions]);
 
   useEffect(() => {
     if (!furnitureOptionsForRoom.length) {
@@ -524,6 +554,7 @@ export default function GeneratorPage() {
         body: JSON.stringify({
           presetSlug: DEFAULT_PRESET_SLUG,
           roomType,
+          scene: selectedScene || undefined,
           furnitureTypes: selectedFurnitureTypes,
           featuredProductsByType,
           styleTags: selectedStyleTag ? [selectedStyleTag] : []
@@ -592,14 +623,55 @@ export default function GeneratorPage() {
               </div>
             </div>
 
+            {sceneOptions.length > 0 && (
+              <div>
+                <label htmlFor="scene">Scene (optional)</label>
+                <div className="row" style={{ gap: '0.4rem' }}>
+                  <select
+                    id="scene"
+                    value={selectedScene}
+                    onChange={(event) => setSelectedScene(event.target.value)}
+                    disabled={roomOptionsLoading}
+                    style={{ flex: 1 }}
+                  >
+                    <option value="">Any scene</option>
+                    {availableScenesForRoom.map((s) => (
+                      <option key={s.scene} value={s.scene}>
+                        {s.scene}
+                        {s.rooms.length === 1 ? ` (${s.rooms[0]})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedScene && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedScene('')}
+                      style={{ flexShrink: 0 }}
+                      title="Clear scene"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                {roomAutoLocked && (
+                  <p className="mono" style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', color: '#6b7280' }}>
+                    Room auto-selected from scene
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
               <label htmlFor="roomType">Room Type</label>
               <div className="row" style={{ gap: '0.4rem' }}>
                 <select
                   id="roomType"
                   value={roomType}
-                  onChange={(event) => setRoomType(event.target.value)}
-                  disabled={roomOptionsLoading || !filteredRoomOptions.length}
+                  onChange={(event) => {
+                    setRoomType(event.target.value);
+                    setSelectedScene('');
+                  }}
+                  disabled={roomOptionsLoading || !filteredRoomOptions.length || roomAutoLocked}
                   style={{ flex: 1 }}
                 >
                   {filteredRoomOptions.length ? (
@@ -612,17 +684,20 @@ export default function GeneratorPage() {
                     <option value="">No rooms for selected style tag</option>
                   )}
                 </select>
-                <button
-                  type="button"
-                  disabled={filteredRoomOptions.length < 2}
-                  onClick={() => {
-                    const others = filteredRoomOptions.filter((r) => r.roomType !== roomType);
-                    setRoomType(others[Math.floor(Math.random() * others.length)].roomType);
-                  }}
-                  style={{ flexShrink: 0 }}
-                >
-                  ↺
-                </button>
+                {!roomAutoLocked && (
+                  <button
+                    type="button"
+                    disabled={filteredRoomOptions.length < 2}
+                    onClick={() => {
+                      const others = filteredRoomOptions.filter((r) => r.roomType !== roomType);
+                      setRoomType(others[Math.floor(Math.random() * others.length)].roomType);
+                      setSelectedScene('');
+                    }}
+                    style={{ flexShrink: 0 }}
+                  >
+                    ↺
+                  </button>
+                )}
               </div>
             </div>
 

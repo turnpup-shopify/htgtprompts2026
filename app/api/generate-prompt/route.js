@@ -114,8 +114,10 @@ export async function POST(request) {
       );
     }
 
+    const requestedScene = String(body.scene || '').trim();
+
     const masterRows = await getMasterRows();
-    const masterRow = findMasterRowByRoom(requestedRoomType, masterRows);
+    const masterRow = findMasterRowByRoom(requestedRoomType, masterRows, requestedScene);
 
     if (masterRows.length && !masterRow) {
       return Response.json(
@@ -325,6 +327,7 @@ export async function POST(request) {
       input: {
         roomType: requestedRoomType,
         category: requestedRoomType,
+        scene: requestedScene || null,
         styleTags: requestedStyleTags,
         furnitureTypes: requestedFurnitureTypes,
         featuredProductsByType
