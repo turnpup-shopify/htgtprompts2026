@@ -219,11 +219,12 @@ export default function GeneratorPage() {
       return;
     }
 
-    setRoomType((current) =>
-      filteredRoomOptions.some((item) => item.roomType === current)
+    setRoomType((current) => {
+      if (current === '') return '';
+      return filteredRoomOptions.some((item) => item.roomType === current)
         ? current
-        : filteredRoomOptions[0].roomType
-    );
+        : filteredRoomOptions[0].roomType;
+    });
   }, [filteredRoomOptions]);
 
   // When scene maps to exactly one room, auto-select it.
@@ -751,11 +752,8 @@ export default function GeneratorPage() {
                     disabled={roomOptionsLoading || !filteredRoomOptions.length || roomAutoLocked}
                     style={{ flex: 1 }}
                   >
-                    {filteredRoomOptions.length ? (
-                      filteredRoomOptions.map((item) => <option key={item.roomType} value={item.roomType}>{item.roomType}</option>)
-                    ) : (
-                      <option value="">No rooms available</option>
-                    )}
+                    <option value="">Any room</option>
+                    {filteredRoomOptions.map((item) => <option key={item.roomType} value={item.roomType}>{item.roomType}</option>)}
                   </select>
                   {!roomAutoLocked && (
                     <button
