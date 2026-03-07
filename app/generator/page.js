@@ -1119,39 +1119,44 @@ export default function GeneratorPage() {
               </span>
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             {batchResults.map((r, i) => (
-              <div key={i} style={{ background: '#f8faf8', borderRadius: '0.5rem', padding: '0.75rem', border: '1px solid #e5e7eb' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                  <div>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#374151' }}>Mix {i + 1}</span>
-                    {r.input?.roomType && (
-                      <span className="mono" style={{ fontSize: '0.7rem', color: '#9ca3af', marginLeft: '0.5rem' }}>
-                        {r.input.roomType}{r.input.styleTags?.[0] ? ` · ${r.input.styleTags[0]}` : ''}
-                      </span>
+              <details key={i} style={{ background: '#f8faf8', borderRadius: '0.5rem', border: '1px solid #e5e7eb' }}>
+                <summary style={{ padding: '0.6rem 0.75rem', cursor: 'pointer', userSelect: 'none' }}>
+                  <div style={{ display: 'inline-flex', justifyContent: 'space-between', alignItems: 'center', width: 'calc(100% - 1rem)', verticalAlign: 'middle' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#374151' }}>Mix {i + 1}</span>
+                      {r.input?.roomType && (
+                        <span className="mono" style={{ fontSize: '0.7rem', color: '#9ca3af' }}>
+                          {r.input.roomType}{r.input.styleTags?.[0] ? ` · ${r.input.styleTags[0]}` : ''}
+                        </span>
+                      )}
+                      {r.error && <span className="mono" style={{ fontSize: '0.7rem', color: '#991b1b' }}>error</span>}
+                    </div>
+                    {r.prompt && (
+                      <div style={{ display: 'flex', gap: '0.3rem' }} onClick={(e) => e.stopPropagation()}>
+                        <button type="button" onClick={() => handleCopyPrompt(r.prompt)} style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem' }}>Copy</button>
+                        <button
+                          type="button"
+                          onClick={() => toggleSavePrompt(r.prompt)}
+                          style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem', background: isPromptSaved(r.prompt) ? '#fef9c3' : '#f1f5f9', color: '#374151' }}
+                        >
+                          {isPromptSaved(r.prompt) ? '★' : '☆'}
+                        </button>
+                      </div>
                     )}
                   </div>
-                  {r.prompt && (
-                    <div style={{ display: 'flex', gap: '0.3rem' }}>
-                      <button type="button" onClick={() => handleCopyPrompt(r.prompt)} style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem' }}>Copy</button>
-                      <button
-                        type="button"
-                        onClick={() => toggleSavePrompt(r.prompt)}
-                        style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem', background: isPromptSaved(r.prompt) ? '#fef9c3' : '#f1f5f9', color: '#374151' }}
-                      >
-                        {isPromptSaved(r.prompt) ? '★' : '☆'}
-                      </button>
-                    </div>
-                  )}
+                </summary>
+                <div style={{ padding: '0 0.75rem 0.75rem', borderTop: '1px solid #e5e7eb' }}>
+                  {r.error
+                    ? <p className="mono" style={{ margin: '0.6rem 0 0', color: '#991b1b', fontSize: '0.8rem' }}>{r.error}</p>
+                    : <p style={{ margin: '0.6rem 0 0', fontSize: '0.82rem', whiteSpace: 'pre-wrap', lineHeight: 1.55, color: '#1f2523' }}>{r.prompt}</p>
+                  }
                 </div>
-                {r.error
-                  ? <p className="mono" style={{ margin: 0, color: '#991b1b', fontSize: '0.8rem' }}>{r.error}</p>
-                  : <p style={{ margin: 0, fontSize: '0.82rem', whiteSpace: 'pre-wrap', lineHeight: 1.55, color: '#1f2523' }}>{r.prompt}</p>
-                }
-              </div>
+              </details>
             ))}
             {batchLoading && batchResults.length < 5 && (
-              <div style={{ background: '#f8faf8', borderRadius: '0.5rem', padding: '0.75rem', border: '1px dashed #e5e7eb', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ background: '#f8faf8', borderRadius: '0.5rem', padding: '0.65rem 0.75rem', border: '1px dashed #e5e7eb' }}>
                 <span className="mono" style={{ fontSize: '0.78rem', color: '#9ca3af' }}>Generating mix {batchResults.length + 1}…</span>
               </div>
             )}
