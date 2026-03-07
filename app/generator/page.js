@@ -103,7 +103,7 @@ export default function GeneratorPage() {
   const [downloadAllLoading, setDownloadAllLoading] = useState(false);
   const [downloadAllError, setDownloadAllError] = useState('');
   const [variationSeed, setVariationSeed] = useState(0);
-  const [copied, setCopied] = useState(false);
+  const [copiedText, setCopiedText] = useState('');
   const [promptHistory, setPromptHistory] = useState([]);
   const [savedPrompts, setSavedPrompts] = useState([]);
   const [batchResults, setBatchResults] = useState([]);
@@ -692,8 +692,8 @@ export default function GeneratorPage() {
   async function handleCopyPrompt(text) {
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
+      setCopiedText(text);
+      setTimeout(() => setCopiedText((cur) => cur === text ? '' : cur), 1800);
     } catch {}
   }
 
@@ -734,7 +734,6 @@ export default function GeneratorPage() {
               const selectedProduct = selectedProductByFurnitureType[furnitureType];
               const imageOptions = localImageOptionsByKey[key] || [];
               const selectedImage = selectedImageByKey[key] || imageOptions[0]?.filePath || '';
-              const selectedImageOption = imageOptions.find((o) => o.filePath === selectedImage) || null;
 
               return (
                 <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -1063,8 +1062,8 @@ export default function GeneratorPage() {
             />
             {result?.prompt && (
               <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <button type="button" onClick={() => handleCopyPrompt(result.prompt)} style={{ flexShrink: 0, background: copied ? '#d1fae5' : undefined, color: copied ? '#065f46' : undefined, transition: 'background 0.2s' }}>
-                  {copied ? '✓ Copied' : 'Copy'}
+                <button type="button" onClick={() => handleCopyPrompt(result.prompt)} style={{ flexShrink: 0, background: copiedText === result.prompt ? '#d1fae5' : undefined, color: copiedText === result.prompt ? '#065f46' : undefined, transition: 'background 0.2s' }}>
+                  {copiedText === result.prompt ? '✓ Copied' : 'Copy'}
                 </button>
                 <button
                   type="button"
@@ -1135,7 +1134,7 @@ export default function GeneratorPage() {
                     </div>
                     {r.prompt && (
                       <div style={{ display: 'flex', gap: '0.3rem' }} onClick={(e) => e.stopPropagation()}>
-                        <button type="button" onClick={() => handleCopyPrompt(r.prompt)} style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem' }}>Copy</button>
+                        <button type="button" onClick={() => handleCopyPrompt(r.prompt)} style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem', background: copiedText === r.prompt ? '#d1fae5' : undefined, color: copiedText === r.prompt ? '#065f46' : undefined, transition: 'background 0.2s' }}>{copiedText === r.prompt ? '✓' : 'Copy'}</button>
                         <button
                           type="button"
                           onClick={() => toggleSavePrompt(r.prompt)}
@@ -1178,7 +1177,7 @@ export default function GeneratorPage() {
                     {item.input?.roomType || '—'}{item.input?.scene ? ` · ${item.input.scene}` : ''} · v{item.seed + 1}
                   </span>
                   <div style={{ display: 'flex', gap: '0.4rem' }}>
-                    <button type="button" onClick={() => handleCopyPrompt(item.prompt)} style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem' }}>Copy</button>
+                    <button type="button" onClick={() => handleCopyPrompt(item.prompt)} style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem', background: copiedText === item.prompt ? '#d1fae5' : undefined, color: copiedText === item.prompt ? '#065f46' : undefined, transition: 'background 0.2s' }}>{copiedText === item.prompt ? '✓ Copied' : 'Copy'}</button>
                     <button
                       type="button"
                       onClick={() => toggleSavePrompt(item.prompt)}
@@ -1206,7 +1205,7 @@ export default function GeneratorPage() {
               <div key={item.id} style={{ background: '#fefce8', borderRadius: '0.5rem', padding: '0.65rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.35rem' }}>
                   <div style={{ display: 'flex', gap: '0.4rem' }}>
-                    <button type="button" onClick={() => handleCopyPrompt(item.text)} style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem' }}>Copy</button>
+                    <button type="button" onClick={() => handleCopyPrompt(item.text)} style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem', background: copiedText === item.text ? '#d1fae5' : undefined, color: copiedText === item.text ? '#065f46' : undefined, transition: 'background 0.2s' }}>{copiedText === item.text ? '✓ Copied' : 'Copy'}</button>
                     <button type="button" onClick={() => toggleSavePrompt(item.text)} style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem' }}>★ Remove</button>
                   </div>
                 </div>
