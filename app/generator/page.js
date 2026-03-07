@@ -510,35 +510,32 @@ export default function GeneratorPage() {
     setSelectedFurnitureTypes(pickRandomSubset(furnitureOptionsForRoom, 2, 4));
   }
 
-  function handleMixItUp() {
-    if (roomOptions.length < 2) return;
-
-    // Shuffle all rows and pick three distinct ones (or reuse if not enough rows).
+  function computeCrossmixInput() {
+    if (roomOptions.length < 2) return null;
     const shuffled = [...roomOptions].sort(() => Math.random() - 0.5);
     const rowA = shuffled[0]; // contributes: style tag + room type
     const rowB = shuffled[1]; // contributes: furniture types
-
-    // Column 1 — style tag from row A
     const tagsA = Array.isArray(rowA?.styleTags) ? rowA.styleTags.filter(Boolean) : [];
-    const newStyleTag = tagsA.length
-      ? tagsA[Math.floor(Math.random() * tagsA.length)]
-      : selectedStyleTag;
-
-    // Column 3 — furniture from row B (a different room entirely)
+    const styleTag = tagsA.length ? tagsA[Math.floor(Math.random() * tagsA.length)] : '';
     const furnitureB = Array.isArray(rowB?.furnitureTypes) ? rowB.furnitureTypes.filter(Boolean) : [];
-    if (furnitureB.length) {
-      const mixed = pickRandomSubset(furnitureB, 2, 4);
-      // Set immediately so it's visible even if the room type doesn't change
-      // (and therefore the effect won't fire to consume the ref).
-      pendingMixedFurnitureRef.current = mixed;
-      setSelectedFurnitureTypes(mixed);
-    }
+    return {
+      roomType: rowA?.roomType || '',
+      styleTags: styleTag ? [styleTag] : [],
+      furnitureTypes: furnitureB.length ? pickRandomSubset(furnitureB, 2, 4) : [],
+      featuredProductsByType: {},
+    };
+  }
 
-    // Column 2 — room type from row A (paired with its style tag so it stays valid)
-    setSelectedStyleTag(newStyleTag);
-    if (rowA?.roomType) {
-      setRoomType(rowA.roomType);
+  function handleMixItUp() {
+    const input = computeCrossmixInput();
+    if (!input) return;
+
+    if (input.furnitureTypes.length) {
+      pendingMixedFurnitureRef.current = input.furnitureTypes;
+      setSelectedFurnitureTypes(input.furnitureTypes);
     }
+    setSelectedStyleTag(input.styleTags[0] || '');
+    if (input.roomType) setRoomType(input.roomType);
   }
 
   function selectAllFurniture() {
@@ -616,17 +613,17 @@ export default function GeneratorPage() {
     }
   }
 
-  async function runGenerate(seed) {
+  async function runGenerate(seed, overrides = {}) {
     const response = await fetch('/api/generate-prompt', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         presetSlug: DEFAULT_PRESET_SLUG,
-        roomType,
-        scene: selectedScene || undefined,
-        furnitureTypes: selectedFurnitureTypes,
-        featuredProductsByType,
-        styleTags: selectedStyleTag ? [selectedStyleTag] : [],
+        roomType: overrides.roomType !== undefined ? overrides.roomType : roomType,
+        scene: overrides.scene !== undefined ? overrides.scene : (selectedScene || undefined),
+        furnitureTypes: overrides.furnitureTypes !== undefined ? overrides.furnitureTypes : selectedFurnitureTypes,
+        featuredProductsByType: overrides.featuredProductsByType !== undefined ? overrides.featuredProductsByType : featuredProductsByType,
+        styleTags: overrides.styleTags !== undefined ? overrides.styleTags : (selectedStyleTag ? [selectedStyleTag] : []),
         variationSeed: seed
       })
     });
@@ -678,7 +675,10 @@ export default function GeneratorPage() {
     setError('');
     try {
       const results = await Promise.all(
-        [0, 1, 2, 3, 4].map((s) => runGenerate(s).catch((err) => ({ error: err.message })))
+        [0, 1, 2, 3, 4].map((s) => {
+          const input = computeCrossmixInput() || {};
+          return runGenerate(s, input).catch((err) => ({ error: err.message }));
+        })
       );
       setBatchResults(results);
     } catch (err) {
@@ -1007,7 +1007,7 @@ export default function GeneratorPage() {
                   >
                     {batchLoading ? 'Generating 5…' : 'Batch × 5'}
                   </button>
-                  <Tooltip text="Runs 5 prompt variations at once (seeds 1–5) with your current settings. Good for comparing a range of options side by side." />
+                  <Tooltip text="Runs 5 crossmix variations at once — each one gets a freshly randomized room, style, and furniture combo. Good for exploring a wide range of ideas fast." />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
                   <button
