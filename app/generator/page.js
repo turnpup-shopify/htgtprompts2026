@@ -34,6 +34,54 @@ function filenameFromUrl(url, fallback = 'image') {
   }
 }
 
+function Tooltip({ text }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <span
+      style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+      onMouseEnter={() => setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+    >
+      <span style={{
+        cursor: 'default',
+        fontSize: '0.65rem',
+        color: '#9ca3af',
+        border: '1px solid #d1d5db',
+        borderRadius: '50%',
+        width: '1rem',
+        height: '1rem',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        userSelect: 'none',
+        lineHeight: 1,
+        flexShrink: 0,
+      }}>?</span>
+      {visible && (
+        <span style={{
+          position: 'absolute',
+          bottom: 'calc(100% + 6px)',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: '#1f2523',
+          color: '#fff',
+          fontSize: '0.73rem',
+          padding: '0.4rem 0.55rem',
+          borderRadius: '6px',
+          width: '190px',
+          lineHeight: 1.45,
+          zIndex: 20,
+          pointerEvents: 'none',
+          whiteSpace: 'normal',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+        }}>
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export default function GeneratorPage() {
   const [roomOptions, setRoomOptions] = useState([]);
   const [sceneOptions, setSceneOptions] = useState([]);
@@ -938,33 +986,40 @@ export default function GeneratorPage() {
                 <button type="submit" disabled={loading || batchLoading} style={{ fontWeight: 600, flex: 1 }}>
                   {loading ? 'Generating…' : 'Generate'}
                 </button>
-                <button
-                  type="button"
-                  onClick={handleVariation}
-                  disabled={loading || batchLoading || !result}
-                  title={`Variation ${variationSeed + 1} — same settings, different products`}
-                  style={{ flexShrink: 0 }}
-                >
-                  ↺ Variation
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={handleVariation}
+                    disabled={loading || batchLoading || !result}
+                  >
+                    ↺ Variation
+                  </button>
+                  <Tooltip text="Same room and furniture, different seed. Swaps in a fresh set of products without changing any of your settings." />
+                </div>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button
-                  type="button"
-                  onClick={handleBatchGenerate}
-                  disabled={loading || batchLoading}
-                  style={{ flex: 1 }}
-                >
-                  {batchLoading ? 'Generating 5…' : 'Batch × 5'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleMixItUp}
-                  disabled={roomOptions.length < 2 || loading || batchLoading}
-                  style={{ background: '#1e3a5f', color: '#fff', flexShrink: 0 }}
-                >
-                  Crossmix
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flex: 1 }}>
+                  <button
+                    type="button"
+                    onClick={handleBatchGenerate}
+                    disabled={loading || batchLoading}
+                    style={{ flex: 1 }}
+                  >
+                    {batchLoading ? 'Generating 5…' : 'Batch × 5'}
+                  </button>
+                  <Tooltip text="Runs 5 prompt variations at once (seeds 1–5) with your current settings. Good for comparing a range of options side by side." />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={handleMixItUp}
+                    disabled={roomOptions.length < 2 || loading || batchLoading}
+                    style={{ background: '#1e3a5f', color: '#fff' }}
+                  >
+                    Crossmix
+                  </button>
+                  <Tooltip text="Splices a style + room from one random data row with furniture types from a completely different row. Forces unexpected combinations." />
+                </div>
               </div>
             </div>
 
