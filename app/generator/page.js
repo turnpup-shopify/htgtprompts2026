@@ -735,7 +735,6 @@ export default function GeneratorPage() {
               const imageOptions = localImageOptionsByKey[key] || [];
               const selectedImage = selectedImageByKey[key] || imageOptions[0]?.filePath || '';
               const selectedImageOption = imageOptions.find((o) => o.filePath === selectedImage) || null;
-              const selectedImageLabel = selectedImageOption?.relativePath || selectedImageOption?.fileName || selectedImage;
 
               return (
                 <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -788,20 +787,19 @@ export default function GeneratorPage() {
 
   return (
     <main>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
         <h1 style={{ margin: 0 }}>Prompt Generator</h1>
-        <span className="mono" style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-          {catalogSource === 'shopify' ? 'Shopify' : 'Sheets'} · {roomOptionsLoading ? 'loading…' : `${roomOptions.length} rooms`}
+        <span className="mono" style={{ fontSize: '0.72rem', color: '#c0c8bf', letterSpacing: '0.02em' }}>
+          {catalogSource === 'shopify' ? 'shopify' : 'sheets'} · {roomOptionsLoading ? '…' : `${roomOptions.length} rooms`}
         </span>
       </div>
 
       <div className="grid grid-2">
         {/* ── Left: Controls ── */}
         <section className="card">
-          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h2 style={{ margin: 0 }}>Controls</h2>
-            <button type="button" onClick={handleClearAll} style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem' }}>
-              Clear All
+          <div className="row" style={{ justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
+            <button type="button" onClick={handleClearAll} style={{ fontSize: '0.75rem', padding: '0.2rem 0.55rem', background: 'transparent', color: '#9ca3af', border: '1px solid #e5e7eb' }}>
+              Clear all
             </button>
           </div>
 
@@ -982,33 +980,26 @@ export default function GeneratorPage() {
             </details>
 
             {/* Actions */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button type="submit" disabled={loading || batchLoading} style={{ fontWeight: 600, flex: 1 }}>
-                  {loading ? 'Generating…' : 'Generate'}
-                </button>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
+              <button
+                type="submit"
+                disabled={loading || batchLoading}
+                style={{ fontWeight: 700, fontSize: '1rem', padding: '0.8rem', letterSpacing: '0.01em' }}
+              >
+                {loading ? 'Generating…' : 'Generate Prompt'}
+              </button>
+
+              <div style={{ display: 'flex', gap: '0.4rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flex: 1 }}>
                   <button
                     type="button"
                     onClick={handleVariation}
                     disabled={loading || batchLoading || !result}
+                    style={{ flex: 1, background: '#f1f5f9', color: '#374151' }}
                   >
                     ↺ Variation
                   </button>
                   <Tooltip text="Same room and furniture, different seed. Swaps in a fresh set of products without changing any of your settings." />
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flex: 1 }}>
-                  <button
-                    type="button"
-                    onClick={handleBatchGenerate}
-                    disabled={loading || batchLoading}
-                    style={{ flex: 1 }}
-                  >
-                    {batchLoading ? 'Generating 5…' : 'Batch × 5'}
-                  </button>
-                  <Tooltip text="Runs 5 crossmix variations at once — each one gets a freshly randomized room, style, and furniture combo. Good for exploring a wide range of ideas fast." />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
                   <button
@@ -1022,6 +1013,18 @@ export default function GeneratorPage() {
                   <Tooltip text="Splices a style + room from one random data row with furniture types from a completely different row. Forces unexpected combinations." />
                 </div>
               </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <button
+                  type="button"
+                  onClick={handleBatchGenerate}
+                  disabled={loading || batchLoading}
+                  style={{ flex: 1, background: '#f8faf8', color: '#374151', border: '1px solid #e5e7eb', fontSize: '0.875rem' }}
+                >
+                  {batchLoading ? `Generating ${batchResults.length + 1} of 5…` : 'Batch × 5'}
+                </button>
+                <Tooltip text="Generates 5 crossmix prompts in a row — each gets a freshly randomized room, style, and furniture combo." />
+              </div>
             </div>
 
             {error && <p style={{ color: '#991b1b', margin: 0, fontSize: '0.875rem' }}>{error}</p>}
@@ -1032,13 +1035,13 @@ export default function GeneratorPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <section className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
-              <h2 style={{ margin: 0 }}>Prompt Output</h2>
+              <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#6b7280' }}>Output</h2>
               <div style={{ display: 'flex', gap: '0.4rem' }}>
                 <a
                   href="https://higgsfield.ai/image/nano_banana_2"
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem', background: '#1e3a5f', color: '#fff', borderRadius: '0.35rem', textDecoration: 'none', fontWeight: 600 }}
+                  style={{ fontSize: '0.78rem', padding: '0.25rem 0.6rem', background: '#1e3a5f', color: '#fff', borderRadius: '0.35rem', textDecoration: 'none', fontWeight: 600 }}
                 >
                   Generate ↗
                 </a>
@@ -1046,9 +1049,9 @@ export default function GeneratorPage() {
                   href="https://turnpup-shopify.github.io/prompts/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem', background: '#f1f5f9', color: '#374151', borderRadius: '0.35rem', textDecoration: 'none', fontWeight: 600 }}
+                  style={{ fontSize: '0.78rem', padding: '0.25rem 0.6rem', background: '#f1f5f9', color: '#374151', borderRadius: '0.35rem', textDecoration: 'none', fontWeight: 600 }}
                 >
-                  More prompts ↗
+                  Prompts ↗
                 </a>
               </div>
             </div>
@@ -1056,29 +1059,32 @@ export default function GeneratorPage() {
               readOnly
               value={result?.prompt || ''}
               placeholder="Generated prompt will appear here…"
+              style={{ minHeight: '260px' }}
             />
             {result?.prompt && (
-              <div style={{ marginTop: '0.6rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <button type="button" onClick={() => handleCopyPrompt(result.prompt)} style={{ flexShrink: 0 }}>
-                  {copied ? 'Copied!' : 'Copy'}
+              <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => handleCopyPrompt(result.prompt)} style={{ flexShrink: 0, background: copied ? '#d1fae5' : undefined, color: copied ? '#065f46' : undefined, transition: 'background 0.2s' }}>
+                  {copied ? '✓ Copied' : 'Copy'}
                 </button>
                 <button
                   type="button"
                   onClick={() => toggleSavePrompt(result.prompt)}
-                  title={isPromptSaved(result.prompt) ? 'Remove from saved' : 'Save prompt'}
-                  style={{ flexShrink: 0, background: isPromptSaved(result.prompt) ? '#fef9c3' : undefined }}
+                  style={{ flexShrink: 0, background: isPromptSaved(result.prompt) ? '#fef9c3' : '#f1f5f9', color: '#374151' }}
                 >
                   {isPromptSaved(result.prompt) ? '★ Saved' : '☆ Save'}
                 </button>
-                <button
-                  type="button"
-                  onClick={handleDownloadAllSelectedImages}
-                  disabled={!canDownloadAllSelectedImages || downloadAllLoading}
-                >
-                  {downloadAllLoading
-                    ? `Downloading ${selectedImagesForPrompt.length}…`
-                    : `Download images (${selectedImagesForPrompt.length})`}
-                </button>
+                {canDownloadAllSelectedImages && (
+                  <button
+                    type="button"
+                    onClick={handleDownloadAllSelectedImages}
+                    disabled={downloadAllLoading}
+                    style={{ background: '#f1f5f9', color: '#374151' }}
+                  >
+                    {downloadAllLoading
+                      ? `Downloading…`
+                      : `↓ Images (${selectedImagesForPrompt.length})`}
+                  </button>
+                )}
                 {downloadAllError && (
                   <span className="mono" style={{ color: '#991b1b', fontSize: '0.8rem' }}>{downloadAllError}</span>
                 )}
@@ -1096,21 +1102,42 @@ export default function GeneratorPage() {
       </div>
 
       {/* Batch results */}
-      {batchResults.length > 0 && (
+      {(batchResults.length > 0 || batchLoading) && (
         <section className="card" style={{ marginTop: '1rem' }}>
-          <h2 style={{ marginTop: 0, marginBottom: '0.75rem' }}>Batch Results</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Batch Results</h2>
+            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div key={i} style={{
+                  width: '0.5rem', height: '0.5rem', borderRadius: '50%',
+                  background: i < batchResults.length ? '#2d3b34' : '#e5e7eb',
+                  transition: 'background 0.3s',
+                }} />
+              ))}
+              <span className="mono" style={{ fontSize: '0.72rem', color: '#9ca3af', marginLeft: '0.3rem' }}>
+                {batchResults.length}/5
+              </span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
             {batchResults.map((r, i) => (
-              <div key={i} style={{ background: '#f8faf8', borderRadius: '0.5rem', padding: '0.75rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                  <span style={{ fontSize: '0.8rem', color: '#6b7280', fontWeight: 600 }}>Variation {i + 1}</span>
+              <div key={i} style={{ background: '#f8faf8', borderRadius: '0.5rem', padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#374151' }}>Mix {i + 1}</span>
+                    {r.input?.roomType && (
+                      <span className="mono" style={{ fontSize: '0.7rem', color: '#9ca3af', marginLeft: '0.5rem' }}>
+                        {r.input.roomType}{r.input.styleTags?.[0] ? ` · ${r.input.styleTags[0]}` : ''}
+                      </span>
+                    )}
+                  </div>
                   {r.prompt && (
-                    <div style={{ display: 'flex', gap: '0.4rem' }}>
-                      <button type="button" onClick={() => handleCopyPrompt(r.prompt)} style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem' }}>Copy</button>
+                    <div style={{ display: 'flex', gap: '0.3rem' }}>
+                      <button type="button" onClick={() => handleCopyPrompt(r.prompt)} style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem' }}>Copy</button>
                       <button
                         type="button"
                         onClick={() => toggleSavePrompt(r.prompt)}
-                        style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem', background: isPromptSaved(r.prompt) ? '#fef9c3' : undefined }}
+                        style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem', background: isPromptSaved(r.prompt) ? '#fef9c3' : '#f1f5f9', color: '#374151' }}
                       >
                         {isPromptSaved(r.prompt) ? '★' : '☆'}
                       </button>
@@ -1119,10 +1146,15 @@ export default function GeneratorPage() {
                 </div>
                 {r.error
                   ? <p className="mono" style={{ margin: 0, color: '#991b1b', fontSize: '0.8rem' }}>{r.error}</p>
-                  : <p style={{ margin: 0, fontSize: '0.82rem', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{r.prompt}</p>
+                  : <p style={{ margin: 0, fontSize: '0.82rem', whiteSpace: 'pre-wrap', lineHeight: 1.55, color: '#1f2523' }}>{r.prompt}</p>
                 }
               </div>
             ))}
+            {batchLoading && batchResults.length < 5 && (
+              <div style={{ background: '#f8faf8', borderRadius: '0.5rem', padding: '0.75rem', border: '1px dashed #e5e7eb', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span className="mono" style={{ fontSize: '0.78rem', color: '#9ca3af' }}>Generating mix {batchResults.length + 1}…</span>
+              </div>
+            )}
           </div>
         </section>
       )}
