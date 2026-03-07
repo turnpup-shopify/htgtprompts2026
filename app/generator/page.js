@@ -674,13 +674,14 @@ export default function GeneratorPage() {
     setBatchResults([]);
     setError('');
     try {
-      const results = await Promise.all(
-        [0, 1, 2, 3, 4].map((s) => {
-          const input = computeCrossmixInput() || {};
-          return runGenerate(s, input).catch((err) => ({ error: err.message }));
-        })
-      );
-      setBatchResults(results);
+      const results = [];
+      for (let s = 0; s < 5; s++) {
+        const input = computeCrossmixInput() || {};
+        // eslint-disable-next-line no-await-in-loop
+        const result = await runGenerate(s, input).catch((err) => ({ error: err.message }));
+        results.push(result);
+        setBatchResults([...results]);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
