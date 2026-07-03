@@ -791,7 +791,7 @@ export default function GeneratorPage() {
         body: JSON.stringify({ gasUrl: gasUrl.trim(), data: analyzedFields }),
       });
       const json = await res.json();
-      if (!res.ok || json.error) throw new Error(json.error || 'Submission failed');
+      if (!res.ok || json.error) throw new Error(json.detail || json.error || 'Submission failed');
       setSheetSubmitStatus('success');
     } catch (err) {
       setSheetSubmitStatus('error:' + (err?.message || 'Submission failed'));
