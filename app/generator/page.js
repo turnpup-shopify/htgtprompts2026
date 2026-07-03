@@ -1384,6 +1384,41 @@ export default function GeneratorPage() {
             {/* Drawer body — scrollable */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
+              {/* Testing */}
+              <details>
+                <summary style={{ cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, color: '#9ca3af', userSelect: 'none', listStyle: 'none', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <span>▶</span> Testing
+                </summary>
+                <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#9ca3af' }}>
+                    Load sample data to test the sheet submission without uploading an image.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAnalyzedFields({
+                        room_type: 'Minimalist Study',
+                        room_details: 'Floor-to-ceiling windows, recessed wall niche, deep window sill, white plaster walls, no crown molding',
+                        furniture_types: 'Desk, Bench, Accent Chair',
+                        materials: 'Dark stained wood, matte white plaster, linen, brushed metal',
+                        lighting: 'Diffused daylight from floor-to-ceiling windows, warm accent lamp, soft even fill, no harsh shadows',
+                        camera: 'Eye-level, deep linear perspective, 50mm lens feel, horizontal composition',
+                        color_grade: 'Neutral high-key, desaturated warm whites, low contrast',
+                        negative_styling_rules: 'No clutter, no hardware visible, no busy decor, sparse and editorial',
+                        hero_object_placement_logic: 'Open central floor area between desk and window, or on the deep window sill in natural light',
+                        realism_constraints: 'Soft rounded edges, subtle shadow gaps under furniture, realistic reflections on floor, accurate contact shadows',
+                        style_tags: 'Minimalist, Scandinavian',
+                        scene: '',
+                      });
+                      setSheetSubmitStatus('');
+                    }}
+                    style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', background: '#f1f5f9', color: '#374151', border: '1px solid #e5e7eb' }}
+                  >
+                    Load test data
+                  </button>
+                </div>
+              </details>
+
               {/* Image upload zone */}
               <div>
                 <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '0.5rem' }}>
