@@ -2,11 +2,13 @@ export async function POST(req) {
   try {
     const { gasUrl, data } = await req.json();
 
-    if (!gasUrl || !data) {
+    const targetUrl = gasUrl || process.env.GOOGLEAPPSCRIPTURL;
+
+    if (!targetUrl || !data) {
       return Response.json({ error: 'Missing gasUrl or data' }, { status: 400 });
     }
 
-    const res = await fetch(gasUrl, {
+    const res = await fetch(targetUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
