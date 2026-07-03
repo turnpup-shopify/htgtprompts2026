@@ -82,6 +82,21 @@ function Tooltip({ text }) {
   );
 }
 
+const MASTER_FIELDS = [
+  { key: 'room_type', label: 'Room Type', rows: 1 },
+  { key: 'room_details', label: 'Room Details', rows: 3 },
+  { key: 'furniture_types', label: 'Furniture Types', rows: 1 },
+  { key: 'materials', label: 'Materials', rows: 2 },
+  { key: 'lighting', label: 'Lighting', rows: 2 },
+  { key: 'camera', label: 'Camera', rows: 1 },
+  { key: 'color_grade', label: 'Color Grade', rows: 1 },
+  { key: 'negative_styling_rules', label: 'Negative Styling Rules', rows: 2 },
+  { key: 'hero_object_placement_logic', label: 'Hero Object Placement', rows: 2 },
+  { key: 'realism_constraints', label: 'Realism Constraints', rows: 2 },
+  { key: 'style_tags', label: 'Style Tags', rows: 1 },
+  { key: 'scene', label: 'Scene', rows: 1 },
+];
+
 export default function GeneratorPage() {
   const [roomOptions, setRoomOptions] = useState([]);
   const [sceneOptions, setSceneOptions] = useState([]);
@@ -109,11 +124,29 @@ export default function GeneratorPage() {
   const [batchResults, setBatchResults] = useState([]);
   const [batchLoading, setBatchLoading] = useState(false);
 
+  // Image analyzer / hamburger menu
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [uploadedImage, setUploadedImage] = useState(null);
+  const [analyzingImage, setAnalyzingImage] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState('');
+  const [analyzedFields, setAnalyzedFields] = useState(null);
+  const [gasUrl, setGasUrl] = useState(process.env.NEXT_PUBLIC_GAS_URL || '');
+  const [submittingToSheet, setSubmittingToSheet] = useState(false);
+  const [sheetSubmitStatus, setSheetSubmitStatus] = useState('');
+
   // Load saved prompts from localStorage on mount
   useEffect(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('htgt_saved_prompts') || '[]');
       setSavedPrompts(stored);
+    } catch {}
+  }, []);
+
+  // Load GAS URL from localStorage (overrides env default if user saved a custom one)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('htgt_gas_url');
+      if (stored) setGasUrl(stored);
     } catch {}
   }, []);
 
@@ -711,6 +744,62 @@ export default function GeneratorPage() {
     return savedPrompts.some((p) => p.text === text);
   }
 
+  function handleImageFileSelect(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      const [header, base64] = dataUrl.split(',');
+      const mediaType = header.match(/data:([^;]+)/)?.[1] || 'image/jpeg';
+      setUploadedImage({ base64, dataUrl, mediaType, name: file.name });
+      setAnalyzedFields(null);
+      setAnalyzeError('');
+      setSheetSubmitStatus('');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function handleAnalyzeImage() {
+    if (!uploadedImage) return;
+    setAnalyzingImage(true);
+    setAnalyzeError('');
+    setAnalyzedFields(null);
+    try {
+      const res = await fetch('/api/analyze-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: uploadedImage.base64, mediaType: uploadedImage.mediaType }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || 'Analysis failed');
+      setAnalyzedFields(json.data);
+    } catch (err) {
+      setAnalyzeError(err?.message || 'Image analysis failed');
+    } finally {
+      setAnalyzingImage(false);
+    }
+  }
+
+  async function handleSubmitToSheet() {
+    if (!analyzedFields || !gasUrl.trim()) return;
+    setSubmittingToSheet(true);
+    setSheetSubmitStatus('');
+    try {
+      const res = await fetch('/api/submit-to-sheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gasUrl: gasUrl.trim(), data: analyzedFields }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || 'Submission failed');
+      setSheetSubmitStatus('success');
+    } catch (err) {
+      setSheetSubmitStatus('error:' + (err?.message || 'Submission failed'));
+    } finally {
+      setSubmittingToSheet(false);
+    }
+  }
+
   const imageCatalogContent = (() => {
     if (!selectedFurnitureTypes.length) return null;
 
@@ -788,9 +877,28 @@ export default function GeneratorPage() {
     <main>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
         <h1 style={{ margin: 0 }}>Prompt Generator</h1>
-        <span className="mono" style={{ fontSize: '0.72rem', color: '#c0c8bf', letterSpacing: '0.02em' }}>
-          {catalogSource === 'shopify' ? 'shopify' : 'sheets'} · {roomOptionsLoading ? '…' : `${roomOptions.length} rooms`}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <span className="mono" style={{ fontSize: '0.72rem', color: '#c0c8bf', letterSpacing: '0.02em' }}>
+            {catalogSource === 'shopify' ? 'shopify' : 'sheets'} · {roomOptionsLoading ? '…' : `${roomOptions.length} rooms`}
+          </span>
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Open menu"
+            style={{
+              background: 'transparent',
+              border: '1px solid #d8ddd7',
+              borderRadius: '8px',
+              padding: '0.3rem 0.6rem',
+              color: '#2d3b34',
+              fontSize: '1.1rem',
+              lineHeight: 1,
+              cursor: 'pointer',
+            }}
+          >
+            ☰
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-2">
@@ -1231,6 +1339,221 @@ export default function GeneratorPage() {
           </pre>
         </section>
       </details>
+
+      {/* ── Image Analyzer Drawer ── */}
+      {menuOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)',
+              zIndex: 40, cursor: 'pointer',
+            }}
+            onClick={() => setMenuOpen(false)}
+          />
+
+          {/* Panel */}
+          <div style={{
+            position: 'fixed', top: 0, right: 0, bottom: 0,
+            width: 'min(480px, 100vw)',
+            background: '#fff',
+            zIndex: 50,
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '-4px 0 32px rgba(0,0,0,0.14)',
+            borderLeft: '1px solid #d8ddd7',
+          }}>
+
+            {/* Drawer header */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '1rem 1.25rem',
+              borderBottom: '1px solid #e5e7eb',
+              flexShrink: 0,
+            }}>
+              <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>Add Room to Sheet</h2>
+              <button
+                type="button"
+                onClick={() => setMenuOpen(false)}
+                style={{ background: 'transparent', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '0.25rem 0.6rem', fontSize: '1.1rem', lineHeight: 1 }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Drawer body — scrollable */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+              {/* Image upload zone */}
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '0.5rem' }}>
+                  Upload Room Image
+                </label>
+
+                {/* Drop zone / click to browse */}
+                <label
+                  htmlFor="room-image-upload"
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    border: '2px dashed #c6cdc5', borderRadius: '10px',
+                    padding: '1.25rem 1rem', cursor: 'pointer',
+                    background: uploadedImage ? '#f0fdf4' : '#fafaf9',
+                    textAlign: 'center', gap: '0.3rem',
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const file = e.dataTransfer.files?.[0];
+                    if (file?.type.startsWith('image/')) handleImageFileSelect(file);
+                  }}
+                >
+                  <span style={{ fontSize: '1.6rem' }}>📷</span>
+                  <span style={{ fontSize: '0.82rem', color: '#374151', fontWeight: 500 }}>
+                    {uploadedImage ? uploadedImage.name : 'Tap to choose or drag & drop'}
+                  </span>
+                  <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>
+                    From camera roll, files, or computer
+                  </span>
+                </label>
+                <input
+                  id="room-image-upload"
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => handleImageFileSelect(e.target.files?.[0])}
+                />
+
+                {/* Camera capture (shows native camera on iPhone/Android) */}
+                <label
+                  htmlFor="room-camera-capture"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    gap: '0.4rem', marginTop: '0.5rem',
+                    border: '1px solid #d8ddd7', borderRadius: '8px',
+                    padding: '0.45rem', cursor: 'pointer',
+                    background: '#f9fafb', fontSize: '0.8rem', color: '#374151', fontWeight: 500,
+                  }}
+                >
+                  📸 Take Photo
+                </label>
+                <input
+                  id="room-camera-capture"
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  style={{ display: 'none' }}
+                  onChange={(e) => handleImageFileSelect(e.target.files?.[0])}
+                />
+
+                {/* Preview */}
+                {uploadedImage && (
+                  <div style={{ marginTop: '0.75rem', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+                    <img
+                      src={uploadedImage.dataUrl}
+                      alt="Uploaded room"
+                      style={{ width: '100%', maxHeight: '220px', objectFit: 'cover', display: 'block' }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Analyze button */}
+              {uploadedImage && !analyzedFields && (
+                <button
+                  type="button"
+                  onClick={handleAnalyzeImage}
+                  disabled={analyzingImage}
+                  style={{ width: '100%' }}
+                >
+                  {analyzingImage ? 'Analyzing with Claude…' : 'Analyze with Claude'}
+                </button>
+              )}
+
+              {analyzeError && (
+                <p className="mono" style={{ margin: 0, color: '#991b1b', fontSize: '0.8rem', background: '#fef2f2', borderRadius: '6px', padding: '0.5rem 0.75rem' }}>
+                  {analyzeError}
+                </p>
+              )}
+
+              {/* Extracted fields — editable */}
+              {analyzedFields && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>Extracted Fields</span>
+                    <button
+                      type="button"
+                      onClick={handleAnalyzeImage}
+                      disabled={analyzingImage}
+                      style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', background: '#f1f5f9', color: '#374151', border: '1px solid #e5e7eb' }}
+                    >
+                      {analyzingImage ? '…' : 'Re-analyze'}
+                    </button>
+                  </div>
+                  {MASTER_FIELDS.map(({ key, label, rows }) => (
+                    <div key={key}>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block', color: '#6b7280' }}>
+                        {label}
+                      </label>
+                      <textarea
+                        value={analyzedFields[key] || ''}
+                        onChange={(e) => setAnalyzedFields((prev) => ({ ...prev, [key]: e.target.value }))}
+                        rows={rows}
+                        style={{ fontSize: '0.82rem', minHeight: 'auto', resize: 'vertical' }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Google Apps Script URL */}
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>
+                  Google Apps Script URL
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://script.google.com/macros/s/..."
+                  value={gasUrl}
+                  onChange={(e) => {
+                    setGasUrl(e.target.value);
+                    try { localStorage.setItem('htgt_gas_url', e.target.value); } catch {}
+                  }}
+                  style={{ fontSize: '0.82rem' }}
+                />
+                <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: '#9ca3af' }}>
+                  Saved locally. GAS doPost should accept JSON with the master sheet columns.
+                </p>
+              </div>
+
+              {/* Submit button */}
+              {analyzedFields && (
+                <button
+                  type="button"
+                  onClick={handleSubmitToSheet}
+                  disabled={submittingToSheet || !gasUrl.trim()}
+                  style={{ width: '100%', background: '#2d3b34' }}
+                >
+                  {submittingToSheet ? 'Submitting…' : 'Add to Sheet'}
+                </button>
+              )}
+
+              {/* Status messages */}
+              {sheetSubmitStatus === 'success' && (
+                <p style={{ margin: 0, color: '#065f46', background: '#d1fae5', borderRadius: '6px', padding: '0.5rem 0.75rem', fontSize: '0.82rem', fontWeight: 600 }}>
+                  Row added to sheet successfully.
+                </p>
+              )}
+              {sheetSubmitStatus.startsWith('error:') && (
+                <p className="mono" style={{ margin: 0, color: '#991b1b', background: '#fef2f2', borderRadius: '6px', padding: '0.5rem 0.75rem', fontSize: '0.8rem' }}>
+                  {sheetSubmitStatus.replace('error:', '')}
+                </p>
+              )}
+
+            </div>
+          </div>
+        </>
+      )}
+
     </main>
   );
 }
