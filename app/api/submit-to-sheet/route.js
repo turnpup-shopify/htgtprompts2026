@@ -15,8 +15,19 @@ export async function POST(req) {
       redirect: 'follow',
     });
 
+    const responseText = await res.text();
+    console.log('[submit-to-sheet] GAS response:', res.status, responseText.substring(0, 500));
+
     if (!res.ok) {
-      return Response.json({ error: `Script returned HTTP ${res.status}` }, { status: 502 });
+      return Response.json({ error: `Script returned HTTP ${res.status}`, detail: responseText.substring(0, 500) }, { status: 502 });
+    }
+
+    // GAS returns 200 even on script errors — check the body
+    let parsed = null;
+    try { parsed = JSON.parse(responseText); } catch {}
+
+    if (parsed?.error || responseText.toLowerCase().includes('error') && !parsed?.ok) {
+      return Response.json({ error: 'GAS script error', detail: responseText.substring(0, 500) }, { status: 502 });
     }
 
     return Response.json({ ok: true });
