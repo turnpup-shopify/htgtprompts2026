@@ -130,7 +130,7 @@ export default function GeneratorPage() {
   const [analyzingImage, setAnalyzingImage] = useState(false);
   const [analyzeError, setAnalyzeError] = useState('');
   const [analyzedFields, setAnalyzedFields] = useState(null);
-  const [gasUrl, setGasUrl] = useState('https://script.google.com/macros/s/AKfycby1F9bm7RKX8KFx0xHrYhvDypUmHnz70oGyapQvySJ1GLUk31VPpqdCxUYfzieXExChDA/exec');
+  const [gasUrl, setGasUrl] = useState('https://script.google.com/macros/s/AKfycbxn6rEVcQcb2kIDFSBsheDKnaV5rE5_md5L9QAheWlSbew04MI2P0CzgOss02698KvIuQ/exec');
   const [submittingToSheet, setSubmittingToSheet] = useState(false);
   const [sheetSubmitStatus, setSheetSubmitStatus] = useState('');
 
