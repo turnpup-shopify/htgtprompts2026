@@ -1096,42 +1096,49 @@ export default function GeneratorPage() {
                 {loading ? 'Generating…' : 'Generate Prompt'}
               </button>
 
-              <div style={{ display: 'flex', gap: '0.4rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flex: 1 }}>
-                  <button
-                    type="button"
-                    onClick={handleVariation}
-                    disabled={loading || batchLoading || !result}
-                    style={{ flex: 1, background: '#f1f5f9', color: '#374151' }}
-                  >
-                    ↺ Variation
-                  </button>
-                  <Tooltip text="Same room and furniture, different seed. Swaps in a fresh set of products without changing any of your settings." />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
-                  <button
-                    type="button"
-                    onClick={handleMixItUp}
-                    disabled={roomOptions.length < 2 || loading || batchLoading}
-                    style={{ background: '#1e3a5f', color: '#fff' }}
-                  >
-                    Crossmix
-                  </button>
-                  <Tooltip text="Splices a style + room from one random data row with furniture types from a completely different row. Forces unexpected combinations." />
-                </div>
-              </div>
+              <details style={{ marginTop: '0.1rem' }}>
+                <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: '#9ca3af', userSelect: 'none', padding: '0.2rem 0' }}>
+                  More ways to generate
+                </summary>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flex: 1 }}>
+                      <button
+                        type="button"
+                        onClick={handleVariation}
+                        disabled={loading || batchLoading || !result}
+                        style={{ flex: 1, background: '#f1f5f9', color: '#374151' }}
+                      >
+                        ↺ Remix
+                      </button>
+                      <Tooltip text="Same room and furniture, different seed. Swaps in a fresh set of products without changing any of your settings." />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={handleMixItUp}
+                        disabled={roomOptions.length < 2 || loading || batchLoading}
+                        style={{ background: '#1e3a5f', color: '#fff' }}
+                      >
+                        Crossmix
+                      </button>
+                      <Tooltip text="Splices a style + room from one random data row with furniture types from a completely different row. Forces unexpected combinations." />
+                    </div>
+                  </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <button
-                  type="button"
-                  onClick={handleBatchGenerate}
-                  disabled={loading || batchLoading}
-                  style={{ flex: 1, background: '#f8faf8', color: '#374151', border: '1px solid #e5e7eb', fontSize: '0.875rem' }}
-                >
-                  {batchLoading ? `Generating ${batchResults.length + 1} of 5…` : 'Batch × 5'}
-                </button>
-                <Tooltip text="Generates 5 crossmix prompts in a row — each gets a freshly randomized room, style, and furniture combo." />
-              </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <button
+                      type="button"
+                      onClick={handleBatchGenerate}
+                      disabled={loading || batchLoading}
+                      style={{ flex: 1, background: '#f8faf8', color: '#374151', border: '1px solid #e5e7eb', fontSize: '0.875rem' }}
+                    >
+                      {batchLoading ? `Generating ${batchResults.length + 1} of 5…` : 'Batch × 5'}
+                    </button>
+                    <Tooltip text="Generates 5 crossmix prompts in a row — each gets a freshly randomized room, style, and furniture combo." />
+                  </div>
+                </div>
+              </details>
             </div>
 
             {error && <p style={{ color: '#991b1b', margin: 0, fontSize: '0.875rem' }}>{error}</p>}
@@ -1145,12 +1152,12 @@ export default function GeneratorPage() {
               <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#6b7280' }}>Output</h2>
               <div style={{ display: 'flex', gap: '0.4rem' }}>
                 <a
-                  href="https://higgsfield.ai/image/nano_banana_2"
+                  href="https://higgsfield.ai/ai/image?model=nano-banana-pro"
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ fontSize: '0.78rem', padding: '0.25rem 0.6rem', background: '#1e3a5f', color: '#fff', borderRadius: '0.35rem', textDecoration: 'none', fontWeight: 600 }}
                 >
-                  Generate ↗
+                  Open Higgsfield ↗
                 </a>
                 <a
                   href="https://turnpup-shopify.github.io/prompts/"
@@ -1158,7 +1165,7 @@ export default function GeneratorPage() {
                   rel="noopener noreferrer"
                   style={{ fontSize: '0.78rem', padding: '0.25rem 0.6rem', background: '#f1f5f9', color: '#374151', borderRadius: '0.35rem', textDecoration: 'none', fontWeight: 600 }}
                 >
-                  Prompts ↗
+                  Saved Prompts ↗
                 </a>
               </div>
             </div>
